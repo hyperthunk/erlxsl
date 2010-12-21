@@ -33,11 +33,7 @@
  *
  */
 
-/* erts includes */
-#include <erl_driver.h>
-
-/* api include */
-#include "erlxsl_api.h"
+#include "erlxsl_drv.h"
 
 /* internal data structures */
 
@@ -133,6 +129,16 @@ static void outputv(ErlDrvData drv_data, ErlIOVec *ev) {
 	driver_spec* d = (driver_spec*)drv_data;
 	ErlDrvPort port = d->port;
 	xsl_engine* engine = d->provider;
+	
+	int xmlKind, xslKind;
+	int xmlLen, xslLen;
+	int paramCount;
+	
+	xmlKind = read_int32(&(ev->binv[1]->orig_bytes[1]));
+	xslKind = read_int32(&(ev->binv[1]->orig_bytes[2]));
+	xmlLen = read_int32(&(ev->binv[1]->orig_bytes[3]));
+	xslLen = read_int32(&(ev->binv[1]->orig_bytes[4]));
+	
 	long taskHandle = driver_async(port, NULL, engine->handleTransform, ev, NULL); //, engine->postHandle);
 };
 

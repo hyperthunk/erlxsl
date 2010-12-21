@@ -62,8 +62,8 @@ extern "C" {
     //this (following) word size assumption is true in the erlang source, so we should be ok!
     typedef signed   long   int     Int32;
     typedef signed   long   long    Int64;
-	//this is platform dependant but consistent with erts
-	typedef unsigned long			ULong;
+    //this is platform dependant but consistent with erts
+    typedef unsigned long           ULong;
     
     /*
      * Packages information about a parameter (its name and value)
