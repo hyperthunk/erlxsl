@@ -1,0 +1,3 @@
+
+1. port over the existing code from original repos (in progress)
+2. port the driver code over to use EDTK instead of the driver_async API

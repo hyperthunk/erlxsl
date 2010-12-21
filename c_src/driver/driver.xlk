@@ -1,0 +1,142 @@
+/*
+ * xsldrv.c
+ *
+ * Implements an erts linked-in driver, exposing sablotron to erlang.
+ *
+ * Notes:
+ *
+ * This driver is intended for dynamic rather than static linking. The erlang
+ * runtime should be started with a thread pool size option to ensure that
+ * the driver can take advantage of the async driver apis.
+ *
+ * The runtime should also be started with a maximum stack space argument,
+ * to ensure we don't run out of stack space prematurely!
+ *
+ */
+
+#include "protocol.h"
+
+/* internal data structures */
+
+typedef struct {
+    ErlDrvPort port;
+} driver_spec;
+
+/* erts driver callbacks */
+
+static ErlDrvData start_driver(ErlDrvPort port, char *buff) {
+
+    // avoid total madness! nice tip that one...
+    if (port == NULL) {
+        return ERL_DRV_ERROR_GENERAL;
+    }
+
+    // configure erts
+    driver_spec* d = (driver_spec*)driver_alloc(sizeof(driver_spec));
+    d->port = port;
+
+    //allow providers to initialize
+    if ( init_provider() == ProviderError ) {
+        DebugOut("Fail fast...");
+    }
+
+    // respond with driver_spec
+    return (ErlDrvData)d;
+}
+
+static void stop_driver(ErlDrvData handle) {
+
+    // give the provider a chance to clean up
+    destroy_provider();
+
+    // cleanup for erts
+    driver_free((char*)handle);
+}
+
+/*
+ *  This output handler function is called from erlang with
+ *  erlang:port_command(Port, Payload), where the payload looks like:
+ *
+ */
+static void output(ErlDrvData handle, char *buff, int bufflen) {
+    driver_spec* globalDriverSpecData;
+    ErlDrvPort port;
+
+    globalDriverSpecData = (driver_spec*)handle;
+    port = globalDriverSpecData->port;
+
+#ifdef DEBUG
+    fprintf(stderr, "Driver received buffer of size %i\n", ((char *)&bufflen));
+#endif
+
+    ErlDrvTermData callerPid = driver_caller(port);
+
+    RequestContext* context;
+    context = malloc(sizeof(RequestContext));
+    if (NULL == context) {
+        E_OUT_OF_MEMORY;
+        return;
+    }
+
+    context->port = port;
+    context->callerPid = callerPid;
+    TransformRequestPtr request = unpackRequest((const char *)buff, bufflen);
+    if (NULL == request) { //NB: this only happens when the heap is exhausted!
+        releaseContext(context);
+        E_OUT_OF_MEMORY;
+        return;
+    }
+
+    context->request = request;
+    TransformResponse* response = malloc(sizeof(TransformResponse));
+    if (NULL == response) {
+        releaseContext(context);
+        E_OUT_OF_MEMORY;
+        return;
+    }
+
+    response->context = context;
+    long taskHandle = driver_async(port, NULL, handle_request, response, NULL);
+}
+
+static void ready_async(ErlDrvData drv_data, ErlDrvThreadData async_data) {
+    driver_spec* driverBundle = (driver_spec*)drv_data;
+    ErlDrvPort port = driverBundle->port;
+
+    TransformResponse* response = (TransformResponse*)async_data;
+    RequestContext* context = response->context;
+    TransformRequestPtr request = context->request;
+    if ( request->status == ProviderError ) {
+        DebugOut("Fail fast...");
+    }
+    //TODO: consider error handling here...
+    sendResponse(response, NULL);
+
+    if ( post_handle_request(response) == ProviderError ) {
+        DebugOut("Fail fast....");
+    }
+    releaseResponse(response);
+}
+
+static ErlDrvEntry driver_entry = {
+    NULL,                       /* init */
+    start_driver,               /* start, called when port is opened */
+    stop_driver,                /* stop, called when port is closed */
+    output,                     /* output, called when port receives messages */
+    NULL,                       /* ready_input, called when input descriptor ready to read*/
+    NULL,                       /* ready_output, called when output descriptor ready to write */
+    "erlxsl",                   /* the name of the driver */
+    NULL,                       /* finish, called when unloaded */ //TODO: should we do resource disposal here!?
+    NULL,                       /* handle,  */
+    NULL,                       /* control */
+    NULL,                       /* timeout */
+    NULL,                       /* outputv */
+    ready_async,                /* ready_async, called (from the emulator thread) after an asynchronous call has completed. */
+    NULL,                       /* flush */
+    NULL,                       /* call */
+    NULL                        /* event */
+};
+
+DRIVER_INIT(erlxsl) {
+    return &driver_entry;
+}

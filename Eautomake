@@ -1,0 +1,25 @@
+%%% --
+%%% Erlang Automake project file
+%%% Created by/for Process-one Erlang Automake
+%%% --
+
+%%% System information
+{automake, [{version, 1.0}]}.
+
+{projects,
+ [
+%%% -- List your Erlang applications paths:
+  "src"
+%%% -- End
+ ]}.
+
+{options,
+ [
+%%% -- List your project build options:
+  {outdir,"ebin"}
+%%% -- End
+ ]}.
+
+%% Local Variables:
+%% mode: erlang
+%% End:
