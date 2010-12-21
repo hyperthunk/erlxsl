@@ -1,0 +1,55 @@
+
+html {
+	border: 0px;
+    margin: 0px;
+    padding: 0px;
+	font-family: Arial, Geneva, Helvetica, sans-serif;
+}
+
+h3 {
+	font-style: italic;
+	font-size: large;
+}
+
+.logo {
+	background-color: #FFFFFF;
+	background-image: url('http://sflogo.sourceforge.net/sflogo.php?group_id=10127&amp;type=2');
+	background-repeat: no-repeat;
+	background-position: center;
+	border: none;
+}
+
+.navbar {
+	background-color: rgb(110,139,61);
+    padding-top: 1em;
+	padding-left: 1em;
+	padding-right: 1em;
+}
+
+.navbar a {
+	font-weight: bold;
+	color: #000000;
+}
+
+.banner {
+	background-color: rgb(110,139,61);
+    color: rgb(255,236,176);
+    padding-left: 2em;
+	padding-bottom: 0em;
+	text-align: left;
+}
+
+.banner h1 { font-size: 250%; }
+
+.content {
+/*	background-color: rgb(110,139,61);*/
+/*    color: rgb(255,236,176);*/
+    padding: 0.6em;
+	padding-top: 1em;
+	padding-left: 0.8em;
+    margin: 0em;
+    border-width: 0px;
+    vertical-align: baseline;
+	font-family: "verdana";
+    /*border-bottom: 2px solid rgb(110,139,61);*/
+}

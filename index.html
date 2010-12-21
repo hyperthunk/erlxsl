@@ -1,0 +1,246 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN"
+    "http://www.w3.org/TR/html4/strict.dtd">
+<html lang="en">
+	<head>
+		<title>ErlXSL</title>
+		<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+		<link type="text/css" rel="stylesheet" href="resources/style.css"></link>
+		<noscript><!-- TODO: deal with disabled scripting... --></noscript>
+	</head>
+	<body marginwidth="0" marginheight="0">
+		<!-- TODO: write a stylesheet for the layout (or use dojo) instead of using a table -->
+		<table cellspacing="0" cellpadding="0" width="100%">
+			<tr>
+				<td class="banner"><h1>ErlXSL</h1></td>
+				<td>
+					<a style="float: right" href='http://github.com/hyperthunk/def-proxy'>
+				      <img alt='Fork me on GitHub' id='ribbon' src='http://s3.amazonaws.com/github/ribbons/forkme_right_darkblue_121621.png' />
+				    </a>
+				</td>
+			</tr>
+			<tr>
+				<td class="content">
+					<p>
+						This is the home page for the ErlXSL project. The aim of this project is to provide high performance xslt
+						support in erlang. Instead of attempting to implement the xslt specification in Erlang, ErlXSL provides
+						a mechanism by which to plug external XSLT engines into the Erlang virtual machine. The underlying xslt engine
+						can then be accessed at runtime via a typical Erlang API.
+					</p>
+					<h2>What is ErlXSL?</h2>
+					<p>
+						ErlXSL is a framework for building XSLT support into Erlang. ErlXSL consists of a driver program, an XSLT engine
+						provider and an OTP application that communicates with the driver/provider at runtime. ErlXSL provides a wrapper
+						for the driver program that can host it within the same address space as the Beam emulator (i.e., as a linked-in
+						driver) or as an externally running port-program.
+					</p>
+					<p>
+						Please note that ErlXSL is currently in the alpha stages of development, therefore things are likely to change quite fast. 
+						Currently there are some gotchas, especially around the build. These issues should go away over the next couple of weeks/months!
+					</p>
+				</td>
+				<td class="navbar">
+					<a style="padding: 13px" href='http://github.com/hyperthunk/erlxsl' title="Github Repository" >
+						<img src="resources/github-48x48.png" alt="Download from Github" />
+					</a>
+					<a href='http://github.com/hyperthunk/def-proxy/downloads' title="Download from Github (zip archive)">
+				        <img style="width: 65%; height: 55%" src='http://github.com/images/modules/download/zip.png' />
+			        </a>
+			        <a href='http://github.com/hyperthunk/def-proxy/downloads' title="Download from Github (tar archive)">
+			          	<img style="width: 65%; height: 55%" src='http://github.com/images/modules/download/tar.png' />
+			        </a>
+				</td>
+			</tr>
+			<tr>
+				<td class="content">
+					<h2>Overview</h2>
+					<p>
+						I needed to build a fast, stable XSLT provider running on Erlang, capable of handling high loads while providing excellent throughput.
+						The solution I came up with is to expose a suitable existing XSLT engine to Erlang and provide an Erlang-ish API.
+					</p>
+					<h3>Background</h3>
+					<p>
+						At first, I considered using <a href="http://www.lfcia.org/projects/sablotron_adapter/">sablotron_adapter</a> for
+						my needs. That project exposes the C++ xslt library <a href="http://www.gingerall.org/sablotron.html">Sablotron</a>
+						to the Erlang emulator via the c-<a href="http://www.erlang.org/doc/tutorial/c_port.html#4">port</a> mechanism. 
+						To overcome the performance problems associated with using c-ports for interprocess communication, I'm implementing 
+						support for running ErlXSL as a linked-in driver (sometimes also called a "port driver"). The driver code is implemented 
+						in C, compiled into a shared library and dynamically linked in to the emulator at runtime. All driver code runs in the 
+						same address space as the (hosting) virtual machine and no interprocess communication takes place when passing data between 
+						the driver and its connected (erlang) process. There are some risks associated with this approach, which are discussed 
+						in more detail later on and I fully intend to support both the port program and linked-in driver approaches.
+					</p>
+					<p>
+						The linked-in driver is implemented using Erlang's asynchronous driver api, which provides a means for building thread safe, concurrent driver code.
+						Messages sent to the driver are initially unpacked and examined synchronously on the main emulator thread. Once the content of the transformation
+						request is clear (and has been validated), the remaining work (the actual transformation step) is done on an (emulator maintained) thread pool thread.
+						Once processing is complete, a response is sent back to the calling (Erlang) process. This last step also occurs synchronously on an emulator
+						thread. To Erlang client code, this all just looks like standard Erlang message passing - albeit wrapped up behind a gen_server - and no knowledge
+						of the driver and/or port APIs is required. In order for these asynchronous mechanisms to work properly, it is neccessary to start Erlang with
+						flags indicating the required thread pool size and to define the default stack size for pooled threads. Erlang must (obviously) be run
+						in +SMP mode, which is (currently) the default build for most platforms.
+					</p>
+					<h3>Other motivating factors</h3>
+					<p>
+						In order to support xslt 2.0 later on, I didn't want the code to be intimately tied in to
+						<a href="http://www.gingerall.org/sablotron.html">Sablotron</a>. To this end, I decided to separate the driver code (which manages 
+						interactions with the connected Erlang process) from the XSLT engine interaction code. We're now ready to define ErlXSL a bit more clearly:
+					</p>
+					<p>
+						Erlxsl is an Erlang driver that exposes a protocol by which Erlang code can request XSLT transformations on files and/or over
+						Erlang binaries. The external API also exposes a set of data structures which an XSLT provider implementation must use to access information
+						about the request (such as the uri kinds - file or in memory - and the actual input document and stylesheet data). The exposed data
+						structures also provide a means for passing back the response and/or any error handling information to the driver.
+					</p>
+					<h2>Building erlxsl</h2>
+					<p>
+						See the INSTALL file in the source bundle - download links are available in the navbar to your right.
+					</p>
+					<h3>Prerequisites</h3>
+					<p>
+						You'll need to have Make installed on your system, and Erlang/OTP. We recommend using the latest Erlang/OTP release if possible,
+						as it is against this release that erlxsl is tested. Depending on your operating system, there may be some additional dependencies
+						(and in the case of Mac OSX, some salient points about your Erlang/OTP installation), therefore you should read the platform
+						specific advice (below) before attempting to build erlxsl.
+					</p>
+					<h3>The build process</h3>
+					<p>
+						Regardless of the platform you're building for, there are a couple of considerations you need to take into account. The current design of
+						ErlXSL splits the C-source code in two. The first part is the linked in driver and the second, the XSLT engine provider, which the driver calls 
+						to do the actual processing. The driver depends on the provider, in that it declares some 'extern' functions which are not defined in the driver 
+						source code. The driver and provider share a single header file, erlxsl.h, which defines the shared data structures. The provider needs to be 
+						compiled and linked first, then the driver is compiled and linked against the provider. This process does seem a little heavy handed, but it gives 
+						us the flexibility to easily build the driver against different providers when we need to.
+					</p>
+					<h3>Building on Linux</h3>
+					<p>TBC: Haven't tried this yet! :(</p>
+					<h3>Building on Mac OSX</h3>
+					<p>TBC: We're in the process of fixing this!</p>
+					<h3>Building on Windows</h3>
+					<p>
+						<ul>
+							<li>Download and unzip the source code</li>
+							<li>Run the configure script</li>
+							<ul>
+								<li>
+									<h5>Running ./configure under mingw/msys</h5>
+									<p>
+										NB: When building/testing erlxsl on Windows, we've been using mingw (for the compiler toolset) and
+										minsys (for make). Building erlxsl under cygwin may require you to take other steps. If you get ErlXSL
+										built using cygwin and have any insights you'd like to share, please visit our forum(s), the project wiki
+										and/or send us an email.
+									</p>
+									<p>
+										Edit the makefile.in file.
+										CD into the directory where you unzipped the source code. At the top level (folder), run configure.sh.
+										Run the following two commands afterwards, to compile and install erlxsl:
+
+										<pre><code lang="batch">
+C:\> make -f makefile
+C:\> make -f makefile install
+										</code></pre>
+									</p>
+								</li>
+							</ul>
+						</ul>
+					</p>
+					<h3>Running the tests</h3>
+					<p>
+						To run the automated regression tests, change directory to the top level project folder and run make using the following args:
+					</p>
+					<code lang="batch">$prompt> make -f makefile test-all</code>
+					<h3>Usage</h3>
+					<p>
+						The best way to see the usage examples is to look at the tests. The module erlxsl.client also includes comprehensive documentation, which is
+						available in html format under the project root directory in docs/html.
+					</p>
+					<h2>Frequently Asked Questions</h2>
+					<h3>Can I use it "out of the box" to execute/process xml using xslt stylesheets in Erlang?</h3>
+					<p>
+						Sort of! ErlXSL isn't an XSLT engine, it is an interface between a running Erlang VM and some other 3rd party XSLT
+						engine. We currently supply one xslt engine wrapper along with ErlXSL, so you can build it and "get on with stuff" fairly
+						quickly if you want to. It is also "relatively simple" to implement your own "XSLT provider" based on an XSLT engine
+						of your choice. Read on for more details.
+					</p>
+					<h3 id="sablotronimpl">Does erlxsl come with an XSLT provider implementation?</h3>
+					<p>
+						We currently supply an xslt provider based on <a href="http://www.gingerall.org/sablotron.html">Sablotron</a>. We are considering a
+						<a href="http://xmlsoft.org/XSLT/">libxsl</a> based provider as well (although this is not a high priority) and are actively investigating
+						xslt 2.0 engines (whether to use an existing implementation or build our own). For details about using the supplied XSLT provider, see the
+						build/install instructions.
+					</p>
+					<h2>Architecture/Design notes</h2>
+					<p>
+						We'll present an overview of the design here. For the most part we'll be sticking to design goals, as implementation details are bound to
+						change over time.
+					</p>
+					<h3>Design goals</h3>
+					<p>
+						Our primary design goals are:
+						<ul>
+							<li>To conform to the OTP design principles</li>
+							<li>Plug-ability (i.e. the ability to change xslt providers easily)</li>
+							<li>Excellent concurrency (high throughput)</li>
+							<li>Safety (e.g. the driver should <b>never</b> crash the VM)</li>
+						</ul>
+					</p>
+					<p>
+						In its current state, the project probably doesn't meet these design principles fully, however they do represent our final goal(s).
+					</p>
+					<h3>Implementation notes</h3>
+					<p>
+						Our driver implementation uses "the asynchronous driver API", which (informally) means that we use the asynchronous callback functions
+						defined in erl_driver.h (check the source directory of your Erlang distribution or look at the latest OTP documentation for
+						further details). A high(er) level description of this API is available <a href="http://www.erlang.org/doc/tutorial/c_portdriver.html#6">
+						here</a>, with API documentation <a href="http://www.erlang.org/doc/man/erl_driver.html">here</a> and a good example of the asynchronous
+						API available in the second half of <a href="http://www.erlang.org/doc/apps/erts/driver.html#6">this</a> document.
+					</p>
+					<p>
+						We provider the Emulator with the following structure containing driver callbacks:
+						<pre><code lang="c">
+static ErlDrvEntry driver_entry = {
+	NULL,                       /* init */
+	start_driver,               /* start, called when port is opened */
+	stop_driver,                /* stop, called when port is closed */
+	output,                     /* output, called when port receives messages */
+	NULL,                       /* ready_input, called when input descriptor ready to read*/
+	NULL,                       /* ready_output, called when output descriptor ready to write */
+	"erlxsl",                   /* the name of the driver */
+	NULL,                       /* finish, called when unloaded */ //TODO: should we do resource disposal here!?
+	NULL,                       /* handle,  */
+	NULL,                       /* control */
+	NULL,                       /* timeout */
+	NULL,                       /* outputv */
+	ready_async,                /* ready_async, called (from the emulator thread) after an asynchronous call has completed. */
+	NULL,                       /* flush */
+	NULL,                       /* call */
+	NULL                        /* event */
+};
+						</code></pre>
+					</p>
+					<p>
+						The driver recieves calls via erlang:port_command/2 in the 'output' function. Internally, request handling is delegated to a provider's
+						'handle_request' function, which is run on a separate (thread pool) thread, by handing this function off to the
+						<a href="http://www.erlang.org/doc/man/erl_driver.html#driver_async">driver_async</a> function along with a callback and some async data
+						(in the form of a TransformResponse pointer). The provider is responsible for looking at the data provided in this structure, performing
+						the actual transformation, and putting the response data into the correct field of the structure.
+					</p>
+					<h2>Roadmap</h2>
+					<p>
+						Here is an outline of the project roadmap, with some approximate timescales and planned activities.
+					</p>
+					<h3>Release schedule</h3>
+					<p>
+						TBC.
+					</p>
+				</td>
+				<td class="navbar"/>
+			</tr>
+			<tr>
+				<td>
+					
+				</td>
+				<td class="navbar" />
+			</tr>
+		</table>
+	</body>
+</html>
