@@ -1,6 +1,6 @@
 %% -----------------------------------------------------------------------------
 %%
-%% ErlXSL: OTP Application Module
+%% ErlXSL: Marshall
 %%
 %% Copyright (c) 2008-2010 Tim Watson (watson.timothy@gmail.com)
 %%
@@ -22,23 +22,24 @@
 %% OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 %% THE SOFTWARE.
 %% -----------------------------------------------------------------------------
+%%
+%% Handles packing/unpacking the driver protocol.
+%%
+%% -----------------------------------------------------------------------------
 
--module(erlxsl_app).
+%% module annotations
+-module(erlxsl_marshall).
 
--behaviour(application).
+-define(FILE_INPUT, 1).
+-define(BUFFER_INPUT, 2).
+-define(STREAM_INPUT, 3).
 
-%% Application callbacks
--export([start/2, stop/1]).
+%% Public API Exports
+-export([pack/2]).
 
-%% ===================================================================
-%% Application callbacks
-%% ===================================================================
-
-start(_StartType, _StartArgs) ->
-  %% TODO: introduce supervisor
-  %% TODO: introduce externalised config?
-  erlxsl_port_server:start_link([{driver, "sablot_engine"}]).
-
-stop(_State) ->
-	ok.
-
+pack(Input, Stylesheet) when is_binary(Input) andalso is_binary(Stylesheet) ->
+	XmlKind = <<?BUFFER_INPUT:32>>,
+	XslKind = <<?BUFFER_INPUT:32>>,
+	InputLen = size(Input),
+	XslLen = size(Stylesheet),
+	[XmlKind, XslKind, <<InputLen:32>>, <<XslLen:32>>, <<0:32>>, Input, Stylesheet].

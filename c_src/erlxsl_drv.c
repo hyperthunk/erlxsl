@@ -34,6 +34,7 @@
  */
 
 #include <erl_driver.h>
+#include <ei.h>
 #include <stdarg.h>
 #include "erlxsl_api.h"
 
@@ -57,10 +58,13 @@ static void default_shutdown(void*);
 static void cleanup_task(void*);
 static ErlDrvData start_driver(ErlDrvPort, char*);
 static void stop_driver(ErlDrvData);
+static int call(ErlDrvData, unsigned int, char*, int, char**, int, unsigned int*);
 static void outputv(ErlDrvData, ErlIOVec*);
 static void ready_async(ErlDrvData, ErlDrvThreadData);
 static ErlDrvTermData* make_driver_term(ErlDrvPort*, char*, ErlDrvTermData*, long*);
 static ErlDrvTermData* make_driver_term_bin(ErlDrvPort*, ErlDrvBinary*, ErlDrvTermData*, long*);
+
+#define INIT_COMMAND_MAGIC 9
 
 #define DRV_FREE(x) if (NULL != x) driver_free(x)
 
@@ -88,7 +92,8 @@ static void* try_driver_alloc(size_t size, void* pfree, ...) {
 }
 */
 
-static void init_provider(driver_spec *drv, char *buff) {
+static void 
+init_provider(driver_spec *drv, char *buff) {
 	xsl_engine *engine = (xsl_engine*)driver_alloc(sizeof(xsl_engine));
 	if (engine == NULL) {
 		return;
@@ -102,11 +107,13 @@ static void init_provider(driver_spec *drv, char *buff) {
 	drv->provider = engine;
 };
 
-static DriverState default_initialize(void *state) {
+static DriverState 
+default_initialize(void *state) {
 	return Ok;
 };
 
-static void default_handleTransform(void *result) {
+static void 
+default_handleTransform(void *result) {
   transform_result *res = (transform_result*)result;
 	transform_job *job = (res->context)->job;
 	char *output = driver_alloc(sizeof(char) * ((strlen(job->input) + strlen(job->stylesheet)) + 1)); 
@@ -116,13 +123,16 @@ static void default_handleTransform(void *result) {
   res->status = Ok;
 };
 
-static DriverState default_postHandle(void *result) {
+static DriverState 
+default_postHandle(void *result) {
   return Ok;
 };
 
-static void default_shutdown(void *state) {};
+static void 
+default_shutdown(void *state) {};
 
-static void cleanup_task(void *async_state) {
+static void 
+cleanup_task(void *async_state) {
 	request_context *ctx;
 	transform_job *job;
 	param_info *next; 
@@ -156,7 +166,8 @@ static void cleanup_task(void *async_state) {
 };
 
 /* makes a tagged tuple (using the driver term format) for the supplied binary payload. */
-static ErlDrvTermData* make_driver_term_bin(ErlDrvPort *port, ErlDrvBinary *payload, ErlDrvTermData *tag, long *length) {
+static ErlDrvTermData* 
+make_driver_term_bin(ErlDrvPort *port, ErlDrvBinary *payload, ErlDrvTermData *tag, long *length) {
 	ErlDrvTermData *term;
 	ErlDrvTermData  spec[10];
 	
@@ -179,7 +190,8 @@ static ErlDrvTermData* make_driver_term_bin(ErlDrvPort *port, ErlDrvBinary *payl
 	return term;	
 };
 
-static ErlDrvTermData* make_driver_term(ErlDrvPort *port, char *payload, ErlDrvTermData *tag, long *length) {
+static ErlDrvTermData* 
+make_driver_term(ErlDrvPort *port, char *payload, ErlDrvTermData *tag, long *length) {
 	ErlDrvTermData *term;
 	ErlDrvTermData  spec[9];
 	
@@ -210,7 +222,8 @@ static ErlDrvTermData* make_driver_term(ErlDrvPort *port, char *payload, ErlDrvT
 
 /* DRIVER CALLBACK FUNCTIONS */
 
-static ErlDrvData start_driver(ErlDrvPort port, char *buff) {
+static ErlDrvData 
+start_driver(ErlDrvPort port, char *buff) {
     
 	atom_result = driver_mk_atom("result");
 	atom_error  = driver_mk_atom("error");
@@ -239,7 +252,8 @@ static ErlDrvData start_driver(ErlDrvPort port, char *buff) {
 	}
 }
 
-static void stop_driver(ErlDrvData drv_data) {
+static void 
+stop_driver(ErlDrvData drv_data) {
   // give the provider a chance to clean up
   driver_spec *d = (driver_spec*)drv_data;
 	ErlDrvPort port = d->port;
@@ -252,7 +266,34 @@ static void stop_driver(ErlDrvData drv_data) {
   driver_free((char*)drv_data);
 }
 
-static void outputv(ErlDrvData drv_data, ErlIOVec *ev) {
+static int 
+call(ErlDrvData drv_data, unsigned int command, char *buf, 
+	int len, char **rbuf, int rlen, unsigned int *flags) {
+	
+	int i;
+	int size;
+  int index = 0;
+	int rindex = 0;
+	char *p;
+	
+	if (command != INIT_COMMAND_MAGIC) {
+		return((int) ERL_DRV_ERROR_GENERAL);	// this will throw badarg in the emulator
+	}
+	
+	ei_decode_version(buf, &index, &i);
+	ei_get_type(buf, &index, &i, &size);
+  p = driver_alloc(size + 1); 
+  ei_decode_string(buf, &index, p);
+	
+	fprintf(stderr, "Driver received provider init command %s\n", p);
+	DRV_FREE(p);
+	ei_encode_version(*rbuf, &rindex);
+	ei_encode_atom(*rbuf, &rindex, "configured");
+	return(rindex);
+} 
+
+static void 
+outputv(ErlDrvData drv_data, ErlIOVec *ev) {
 	char *error_msg;
 
 	driver_spec *d = (driver_spec*)drv_data;
@@ -343,7 +384,8 @@ static void outputv(ErlDrvData drv_data, ErlIOVec *ev) {
  * Processes the supplied transform_result and sends it to the appropriate
  * erlang process (e.g. the specified receiver)
  */
-static void ready_async(ErlDrvData drv_data, ErlDrvThreadData async_data) {
+static void 
+ready_async(ErlDrvData drv_data, ErlDrvThreadData async_data) {
 	long 								response_len;
 	ErlDrvTermData* 		term;
 	ErlDrvTermData 			callee_pid, tag;
@@ -416,7 +458,7 @@ static ErlDrvEntry driver_entry = {
 	outputv,                    /* outputv */
 	ready_async,                /* ready_async, called (from the emulator thread) after an asynchronous call has completed. */
 	NULL,                       /* flush */
-	NULL,                       /* call */
+	call,                       /* call */
 	NULL                        /* event */
 };
 
