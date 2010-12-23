@@ -46,7 +46,8 @@
         ,terminate/2
         ,code_change/3]).
 
--export([start_link/0
+-export([start/0
+				,start_link/0
         ,info/1
         ,info/2
         ,warn/1
@@ -54,60 +55,64 @@
         ,error/1
         ,error/2]).
 
+start() ->
+  gen_server:start({local, ?MODULE}, ?MODULE, [], []).
+
 start_link() ->
-    gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
+  gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
 info(Format) ->
-    gen_server:cast(?MODULE, {info, Format}).
+  gen_server:cast(?MODULE, {info, Format}).
 
 info(Format, Args) when is_list(Args) ->
-    gen_server:cast(?MODULE, {info, Format, Args}).
+  gen_server:cast(?MODULE, {info, Format, Args}).
 
 warn(Format) ->
-    gen_server:cast(?MODULE, {warn, Format}).
+  gen_server:cast(?MODULE, {warn, Format}).
 
 warn(Format, Args) when is_list(Args) ->
-    gen_server:cast(?MODULE, {warn, Format, Args}).
+  gen_server:cast(?MODULE, {warn, Format, Args}).
 
 error(Format) ->
-    gen_server:cast(?MODULE, {error, Format}).
+  gen_server:cast(?MODULE, {error, Format}).
 
 error(Format, Args) when is_list(Args) ->
-    gen_server:cast(?MODULE, {error, Format, Args}).
+  gen_server:cast(?MODULE, {error, Format, Args}).
 
 %%--------------------------------------------------------------------
 
-init([]) -> {ok, none}.
+init([]) ->
+	{ok, none}.
 
 handle_call(_Request, _From, State) ->
-    {noreply, State}.
+  {noreply, State}.
 
 handle_cast({info, Format}, State) ->
-    error_logger:info_msg(Format),
-    {noreply, State};
+  error_logger:info_msg(Format, []),
+  {noreply, State};
 handle_cast({info, Format, Args}, State) ->
-    error_logger:info_msg(Format, Args),
-    {noreply, State};
+  error_logger:info_msg(Format, Args),
+  {noreply, State};
 handle_cast({warn, Format}, State) ->
-    error_logger:warning_msg(Format),
-    {noreply, State};
+  error_logger:warning_msg(Format, []),
+  {noreply, State};
 handle_cast({warn, Format, Args}, State) ->
-    error_logger:warning_msg(Format, Args),
-    {noreply, State};
+  error_logger:warning_msg(Format, Args),
+  {noreply, State};
 handle_cast({error, Format}, State) ->
-    error_logger:error_msg(Format),
-    {noreply, State};
+  error_logger:error_msg(Format, []),
+  {noreply, State};
 handle_cast({error, Format, Args}, State) ->
-    error_logger:error_msg(Format, Args),
-    {noreply, State};
+  error_logger:error_msg(Format, Args),
+  {noreply, State};
 handle_cast(_Msg, State) ->
-    {noreply, State}.
+  {noreply, State}.
 
 handle_info(_Info, State) ->
-    {noreply, State}.
+  {noreply, State}.
 
 terminate(_Reason, _State) ->
-    ok.
+  ok.
 
 code_change(_OldVsn, State, _Extra) ->
-    {ok, State}.
+  {ok, State}.

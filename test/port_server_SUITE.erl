@@ -50,7 +50,10 @@ all() ->
     ?EXPORT_TESTS(?MODULE).
 
 driver_startup(_) ->
-	ok.
+	%%erlxsl_port_server:transform([{driver, "test_engine"}]).
+	%% application:start(sasl),
+	%% ct:pal("hello", []),
+	erlxsl_app:start().
 
 
 

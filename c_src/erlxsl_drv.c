@@ -276,9 +276,10 @@ call(ErlDrvData drv_data, unsigned int command, char *buf,
 	int rindex = 0;
 	char *p;
 	
-	if (command != INIT_COMMAND_MAGIC) {
+	/*if (command != INIT_COMMAND_MAGIC) {
+		fprintf(stdout, "Driver received improper command code %i\n", command);
 		return((int) ERL_DRV_ERROR_GENERAL);	// this will throw badarg in the emulator
-	}
+	}*/
 	
 	ei_decode_version(buf, &index, &i);
 	ei_get_type(buf, &index, &i, &size);

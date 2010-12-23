@@ -14,3 +14,8 @@ deps/*
 test/logs/
 */logs/*
 logs/
+ebin/erlxsl_app.erl
+ebin/erlxsl_fast_log.erl
+ebin/erlxsl_marshall.erl
+ebin/erlxsl_port_server.erl
+ebin/erlxsl_sup.erl

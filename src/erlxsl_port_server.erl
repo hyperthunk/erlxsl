@@ -37,23 +37,26 @@
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
 %% Public API Exports
--export([start/1, start_link/1]).
+-export([start/0, start_link/0]).
 
 -define(SERVER, ?MODULE).
 -define(PORT_INIT, 9).		%% magic number indicating that the port should initialize itself 
 
 %% public api
-start(Config) ->
-	gen_server:start(?SERVER, [Config], []).
+start() ->
+	gen_server:start(?SERVER, [], []).
 
-start_link(Config) ->
-	gen_server:start_link(?SERVER, [Config], []).
+start_link() ->
+	gen_server:start_link(?SERVER, [], []).
 
 %% gen_server api
-init(Config) ->
-  Options = proplists:get_value(driver_options, Config, []),
-	case proplists:get_value(driver, Options, missing) of 
-		missing -> {stop, {config_error, "No XSLT Engine Specified."}};
+init([]) ->
+	erlxsl_fast_log:info("initializing port_server...~n"),
+	Config = application:get_all_env(erlxsl),
+	%% io:format("APPCONFIG [~p]~n", [Config]),
+  Options = proplists:get_value(driver_options, Config, [{driver, "default_provider"}]),
+	case proplists:get_value(driver, Options) of 
+		undefined -> {stop, {config_error, "No XSLT Engine Specified."}};
 		Provider ->
 			process_flag(trap_exit, true),
 			init_driver(Config, Provider)
@@ -77,7 +80,8 @@ handle_info(Unknown, State) ->
 terminate(Reason, State) ->
 	erlxsl_fast_log:info("Terminating due to [~p]~n", [Reason]),
 	Driver = proplists:get_value(driver, State, "erlxsl_drv"),
-	catch erl_ddll:unload_driver(Driver).
+	catch erl_ddll:unload_driver(Driver),
+	ok.
 
 code_change(_OldVsn, State, _Extra) ->
 	{ok, State}.
@@ -99,39 +103,23 @@ handle_transform(Input, Stylesheet, State) ->
 init_driver(Config, Provider) ->
 	erl_ddll:start(),
 	% load driver
-	PrivDir = code:priv_dir(erlxsl),
+	BaseDir = filename:rootname(filename:dirname(filename:absname(code:which(erlxsl_app))), "ebin"),
+	PrivDir = filename:join(BaseDir, "priv"),
 	BinPath = proplists:get_value(load_path, Config, PrivDir),
 	Driver = proplists:get_value(driver, Config, "erlxsl_drv"),
 	init_lib({erl_ddll:load_driver(BinPath, Driver), Driver}, Config, Provider).
 
 init_lib({{error, Error}, _}, _, _) ->
-    {stop, {Error, erl_ddll:format_error(Error)}};
+  {stop, {Error, erl_ddll:format_error(Error)}};
 init_lib({ok, Driver}, Config, Provider) ->
-	LoadTimeout = proplists:get_value(load_timeout, Config, 1000000),
-  Self = self(),
-  Pid = spawn_link(
-  	fun() ->
-    	Port = open_port({spawn, Driver}, [binary]),
-      Self ! {self(), {port, Port}}
-    end
-  ),
-  receive
-  	{Pid, {port,_}=PSpec} -> 
-			init_port([PSpec|Config], Provider);
-    {'EXIT', Pid, Reason} -> 
-			{stop, Reason}
-	after 
-		LoadTimeout -> {stop, load_timeout}
-  end.
+	Port = open_port({spawn, Driver}, [binary]),
+	init_port([{port, Port}|Config], Provider).
 
 init_port(Config, Provider) ->
 	Port = proplists:get_value(port, Config),
-	try (erlang:port_call(Port, ?PORT_INIT, term_to_binary(Provider))) of
-		Status ->
-			case binary_to_term(Status) of
-				configured -> {ok, Config};
-				Other -> {stop, {unexpected_driver_state, Other}}
-			end
+	try (erlang:port_call(Port, 9, term_to_binary(Provider))) of
+		configured -> {ok, Config};
+		Other -> {stop, {unexpected_driver_state, Other}}
 	catch 
 		_:Badness -> 
 			terminate(Badness, Config),

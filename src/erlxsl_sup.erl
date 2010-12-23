@@ -1,6 +1,6 @@
 %% -----------------------------------------------------------------------------
 %%
-%% ErlXSL: OTP Application Module
+%% ErlXSL: OTP Supervisor
 %%
 %% Copyright (c) 2008-2010 Tim Watson (watson.timothy@gmail.com)
 %%
@@ -23,31 +23,34 @@
 %% THE SOFTWARE.
 %% -----------------------------------------------------------------------------
 
--module(erlxsl_app).
+-module(erlxsl_sup).
 
--behaviour(application).
+-behaviour(supervisor).
 
-%% Application callbacks
--export([start/0, start/2, stop/1]).
+%% API
+-export([start_link/0]).
 
+-export([init/1]).
 
-%%%
-%%% Application API
-%%%
-start() ->
-	%% ct:pal("requesting app startup", []),
-  application:start(sasl),
-	application:start(erlxsl).
+-define(CHILD(I, Type), {I, {I, start_link, []}, permanent, 5000, Type, [I]}).
+-define (IF (Bool, A, B), if Bool -> A; true -> B end).
 
 %% ===================================================================
-%% Application callbacks
+%% API functions
 %% ===================================================================
 
-start(_StartType, _StartArgs) ->
-  {ok, Pid} = erlxsl_sup:start_link(),
-	erlxsl_fast_log:info("ALL DONE!"),
-	{ok, Pid}.
+start_link() ->
+    supervisor:start_link({local, ?MODULE}, ?MODULE, []).
 
-stop(_State) ->
-	ok.
+%% ===================================================================
+%% Supervisor callbacks
+%% ===================================================================
+
+init([]) ->
+    Children = [
+			{erlxsl_fast_log, {erlxsl_fast_log, start_link, []}, permanent, 5000, worker, [gen_server]},
+			{erlxsl_port_server, {erlxsl_port_server, start_link, []}, permanent, 5000, worker, [gen_server]}
+		],
+    {ok, {{one_for_one, 10, 10}, Children}}.
+
 
