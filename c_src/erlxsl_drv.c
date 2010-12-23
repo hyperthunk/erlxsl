@@ -41,7 +41,7 @@
 /* INTERNAL DATA & DATA STRUCTURES */
 
 typedef struct {
-  ErlDrvPort  port;
+  void*  port;
 	xsl_engine* provider;
 } driver_spec;
 
@@ -237,7 +237,7 @@ start_driver(ErlDrvPort port, char *buff) {
 	if (d == NULL) {
 		return ERL_DRV_ERROR_GENERAL; // TODO: use ERL_DRV_ERROR_ERRNO and provide out-of-memory info
 	}
-  d->port = port;    
+  d->port = (void*)port;    
 
 	init_provider(d, buff);
 	if (d->provider == NULL) {
@@ -256,7 +256,7 @@ static void
 stop_driver(ErlDrvData drv_data) {
   // give the provider a chance to clean up
   driver_spec *d = (driver_spec*)drv_data;
-	ErlDrvPort port = d->port;
+	ErlDrvPort port = (ErlDrvPort)d->port;
 	xsl_engine *engine = d->provider;
 	void *state = &port;
 	engine->shutdown(state);
@@ -297,7 +297,7 @@ outputv(ErlDrvData drv_data, ErlIOVec *ev) {
 	char *error_msg;
 
 	driver_spec *d = (driver_spec*)drv_data;
-	ErlDrvPort port = d->port;
+	ErlDrvPort port = (ErlDrvPort)d->port;
 	ErlDrvTermData callee_pid = driver_caller(port);
 	ErlDrvBinary *bin = ev->binv[1];
 	xsl_engine *engine = d->provider;
@@ -401,7 +401,7 @@ ready_async(ErlDrvData drv_data, ErlDrvThreadData async_data) {
 	
 	driverBundle 	= (driver_spec*)drv_data;
 	provider	 		= (xsl_engine*)driverBundle->provider;
-  port		 	 		= driverBundle->port;
+  port		 	 		= (ErlDrvPort)driverBundle->port;
   result 		 		= (transform_result*)async_data;
 	context 	 		= result->context;
 	job		 	 			= context->job;

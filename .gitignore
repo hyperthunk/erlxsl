@@ -13,3 +13,4 @@ priv/
 deps/*
 test/logs/
 */logs/*
+logs/
