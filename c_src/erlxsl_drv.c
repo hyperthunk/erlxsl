@@ -34,6 +34,7 @@
  */
 
 #include <erl_driver.h>
+#include <stdarg.h>
 #include "erlxsl_api.h"
 
 /* INTERNAL DATA & DATA STRUCTURES */
@@ -57,7 +58,9 @@ static ErlDrvData start_driver(ErlDrvPort, char*);
 static void stop_driver(ErlDrvData);
 static void outputv(ErlDrvData, ErlIOVec*);
 static void ready_async(ErlDrvData, ErlDrvThreadData);
-static void cleanup_job(transform_job* job);
+static void cleanup_job(transform_job*);
+static ErlDrvTermData* make_driver_term(ErlDrvPort*, char*, ErlDrvTermData*, long*);
+static ErlDrvTermData* make_driver_term_bin(ErlDrvPort*, ErlDrvBinary*, ErlDrvTermData*, long*);
 
 #define DRV_FREE(x) if (NULL != x) driver_free(x)
 
@@ -68,57 +71,116 @@ static void cleanup_job(transform_job* job);
 
 /* INTERNAL DRIVER FUNCTIONS */
 
-static void init_provider(driver_spec* drv, char* buff) {
-	xsl_engine* engine = (xsl_engine*)driver_alloc(sizeof(xsl_engine));
+//static void* try_driver_alloc(size_t size, void* pfree, ...) {
+	
+//}
+
+static void init_provider(driver_spec *drv, char *buff) {
+	xsl_engine *engine = (xsl_engine*)driver_alloc(sizeof(xsl_engine));
 	if (engine == NULL) {
 		return;
 	}
 	engine->initialize = default_initialize;
 	engine->transform = default_handleTransform;
-	engine->afterTransform = default_postHandle;
+	engine->after_transform = default_postHandle;
 	engine->shutdown = default_shutdown;
 	
 	// NB: this is a temporary structure for testing/discovery
 	drv->provider = engine;
 };
 
-static DriverState default_initialize(void* state) {
+static DriverState default_initialize(void *state) {
 	return Ok;
 };
 
-static void default_handleTransform(void* result) {
-  transform_result* res = (transform_result*)result;
-	char* data;
-  data = "<response><name>This is very silly!</name><value>NUTS</value></response>";
-  res->payload = data;
+static void default_handleTransform(void *result) {
+  transform_result *res = (transform_result*)result;
+	transform_job *job = (res->context)->job;
+	char *output = driver_alloc(sizeof(char) * ((strlen(job->input) + strlen(job->stylesheet)) + 1)); 
+	strcpy(output, job->input);
+	strcpy(output, job->stylesheet);
+  res->payload.buffer = output;
   res->status = Ok;
 };
 
-static DriverState default_postHandle(void* result) {
+static DriverState default_postHandle(void *result) {
   return Ok;
 };
 
-static void default_shutdown(void* state) {};
+static void default_shutdown(void *state) {};
 
 static void cleanup_job(transform_job* job) {
-	param_info* next; 
-	param_info* current;
+	param_info *next; 
+	param_info *current;
 	
-  if (NULL != job) {
-		DRV_FREE(job->inputData);
-		DRV_FREE(job->stylesheetData);
+  if (job != NULL) {
+		DRV_FREE(job->input);
+		DRV_FREE(job->stylesheet);
     
 	  current = job->parameters;
-		while (NULL != current) {
+		while (current != NULL) {
 		  next = (param_info*)current->next;
-		  DRV_FREE(current->name);
+		  DRV_FREE(current->key);
 		  DRV_FREE(current->value);
 		  current = next;
 		}
 	
 		DRV_FREE(job);
   }
-}
+};
+
+/* makes a tagged tuple (using the driver term format) for the supplied binary payload. */
+static ErlDrvTermData* make_driver_term_bin(ErlDrvPort *port, ErlDrvBinary *payload, ErlDrvTermData *tag, long *length) {
+	ErlDrvTermData *term;
+	ErlDrvTermData  spec[10];
+	
+	spec[0] = ERL_DRV_ATOM;
+	spec[1] = *tag;
+	spec[2] = ERL_DRV_PORT;
+	spec[3] = driver_mk_port(*port);
+	spec[4] = ERL_DRV_BINARY; 
+	spec[5] = (ErlDrvTermData)payload; 
+	spec[6] = ERL_DRV_UINT;
+	spec[7] = payload->orig_size;
+	spec[8] = ERL_DRV_TUPLE; 
+	spec[9] = 3;
+
+  term = malloc(sizeof(spec));
+	if (NULL != term) {
+		memcpy(term, &spec, sizeof(spec));
+		*length = sizeof(spec) / sizeof(spec[0]);
+	}
+	return term;	
+};
+
+static ErlDrvTermData* make_driver_term(ErlDrvPort *port, char *payload, ErlDrvTermData *tag, long *length) {
+	ErlDrvTermData *term;
+	ErlDrvTermData  spec[9];
+	
+	spec[0] = ERL_DRV_ATOM;
+	spec[1] = *tag;
+	spec[2] = ERL_DRV_PORT;
+	spec[3] = driver_mk_port(*port);
+	/*if (result->format == Binary) {
+		spec[4] = ERL_DRV_BINARY; 
+		spec[5] = (ErlDrvBinary*)payload; 
+		spec[6] = ERL_DRV_UINT;
+		spec[7] = result->size;
+	} else {*/
+	spec[4] = ERL_DRV_BUF2BINARY;
+	spec[5] = payload;
+	spec[6] = strlen(payload);
+	/*}*/
+	spec[7] = ERL_DRV_TUPLE; 
+	spec[8] = 3;
+
+  term = malloc(sizeof(spec));
+	if (NULL != term) {
+		memcpy(term, &spec, sizeof(spec));
+		*length = sizeof(spec) / sizeof(spec[0]);
+	}
+	return term;
+};
 
 /* DRIVER CALLBACK FUNCTIONS */
 
@@ -132,7 +194,7 @@ static ErlDrvData start_driver(ErlDrvPort port, char *buff) {
       return ERL_DRV_ERROR_GENERAL;
   }
 
-  driver_spec* d = (driver_spec*)driver_alloc(sizeof(driver_spec));
+  driver_spec *d = (driver_spec*)driver_alloc(sizeof(driver_spec));
 	if (d == NULL) {
 		return ERL_DRV_ERROR_GENERAL; // TODO: use ERL_DRV_ERROR_ERRNO and provide out-of-memory info
 	}
@@ -142,6 +204,7 @@ static ErlDrvData start_driver(ErlDrvPort port, char *buff) {
 	if (d->provider == NULL) {
 		return ERL_DRV_ERROR_GENERAL; // TODO: use ERL_DRV_ERROR_ERRNO and provide out-of-memory info
 	}
+	
 	DriverState state = (d->provider)->initialize(d);
 	if (state == Ok) {
 		return (ErlDrvData)d;
@@ -152,10 +215,10 @@ static ErlDrvData start_driver(ErlDrvPort port, char *buff) {
 
 static void stop_driver(ErlDrvData drv_data) {
   // give the provider a chance to clean up
-  driver_spec* d = (driver_spec*)drv_data;
+  driver_spec *d = (driver_spec*)drv_data;
 	ErlDrvPort port = d->port;
-	xsl_engine* engine = d->provider;
-	void* state = &port;
+	xsl_engine *engine = d->provider;
+	void *state = &port;
 	engine->shutdown(state);
 
   // driver cleanup
@@ -164,20 +227,102 @@ static void stop_driver(ErlDrvData drv_data) {
 }
 
 static void outputv(ErlDrvData drv_data, ErlIOVec *ev) {
-	driver_spec* d = (driver_spec*)drv_data;
+	char *error_msg;
+
+	driver_spec *d = (driver_spec*)drv_data;
 	ErlDrvPort port = d->port;
-	xsl_engine* engine = d->provider;
+	ErlDrvTermData callee_pid = driver_caller(port);
+	ErlDrvBinary *bin = ev->binv[1];
+	xsl_engine *engine = d->provider;
+	// assert(ev->binv[1] != NULL)	
 	
-	int xmlKind, xslKind;
-	int xmlLen, xslLen;
-	int paramCount;
+	int bin_size = bin->orig_size;
+	if (bin_size < 5) {
+		error_msg = "InconsistentInputHeaders: driver protocol not recognised.";
+		driver_output2(port, error_msg, strlen(error_msg), NULL, 0);
+		return;
+	}
 	
-	xmlKind = READ_Int32(&(ev->binv[1]->orig_bytes[1]));
-	xslKind = READ_Int32(&(ev->binv[1]->orig_bytes[2]));
-	xmlLen  = READ_Int32(&(ev->binv[1]->orig_bytes[3]));
-	xslLen  = READ_Int32(&(ev->binv[1]->orig_bytes[4]));
+	int offset = 1;
+	int xml_kind = READ_Int32(&(bin->orig_bytes[++offset]));
+	int xsl_kind = READ_Int32(&(bin->orig_bytes[++offset]));
+	int xml_len = READ_Int32(&(bin->orig_bytes[++offset]));
+	int xsl_len = READ_Int32(&(bin->orig_bytes[++offset]));
+	int param_count = READ_Int32(&(bin->orig_bytes[++offset]));
 	
-	driver_async(port, NULL, engine->transform, ev, NULL); //, engine->postHandle);
+	if (xml_len > (bin_size - 5)) {
+		// NB: I'm being lazy an reusing bin_size as the term length parameter here
+		error_msg = "BufferSizeMismatch: input length exceeds stated buffer size.";
+		driver_output2(port, error_msg, strlen(error_msg), NULL, 0);
+		return;
+	}
+	if (xsl_len > (bin_size - (5 + xml_len))) {
+		error_msg = "BufferSizeMismatch: stylesheet length exceeds stated buffer size.";
+		driver_output2(port, error_msg, strlen(error_msg), NULL, 0);
+		return;
+	}
+	// TODO: add support for parameters also!
+	
+	char *xml = driver_alloc((sizeof(char) * xml_len) + 1);
+	if (xml == NULL) {
+		driver_failure_atom(port, "system_limit");
+		return;
+	}
+	
+	char *xsl = driver_alloc((sizeof(char) * xsl_len) + 1);
+	if (xsl == NULL) {
+		DRV_FREE(xml);
+		driver_failure_atom(port, "system_limit");
+		return;
+	}
+	
+	transform_job *job = (transform_job*)driver_alloc(sizeof(transform_job));
+	if (job == NULL) {
+		DRV_FREE(xml);
+		DRV_FREE(xsl);
+		driver_failure_atom(port, "system_limit");
+		return;
+	}
+	
+	request_context *ctx = (request_context*)driver_alloc(sizeof(request_context));
+	if (ctx == NULL) {
+		DRV_FREE(xml);
+		DRV_FREE(xsl);
+		DRV_FREE(job);
+		driver_failure_atom(port, "system_limit");
+		return;
+	}
+	
+	transform_result *result = (transform_result*)driver_alloc(sizeof(transform_result));
+	if (result == NULL) {	
+		DRV_FREE(xml);
+		DRV_FREE(xsl);
+		DRV_FREE(job);
+		DRV_FREE(ctx);
+		driver_failure_atom(port, "system_limit");
+		return;
+	}
+	
+	// this approach only works when we're running with SMP support! Check by calling driver_system_info()
+	// TODO: either mutex this for non-SMP systems or do a copy operation instead
+	// driver_binary_inc_refc(bin);
+	
+	// we save the copying until we're sure it'll take place...
+	strncpy(xml, &bin->orig_bytes[offset], xml_len);
+	offset += xml_len;
+	strncpy(xsl, &bin->orig_bytes[offset], xsl_len);
+	
+	job->input_kind = xml_kind;
+	job->xsl_kind = xsl_kind;
+	job->input = xml;
+	job->stylesheet = xsl;
+	ctx->port = port;
+	ctx->caller_pid = callee_pid;
+	ctx->job = job;
+	result->context = ctx;
+	
+	// TODO: consider using an explicit cleanup function instead of relying solely on ready_async and engine->after_transform
+	driver_async(port, NULL, engine->transform, result, NULL); //, engine->postHandle);
 };
 
 /*
@@ -185,18 +330,16 @@ static void outputv(ErlDrvData drv_data, ErlIOVec *ev) {
  * erlang process (e.g. the specified receiver)
  */
 static void ready_async(ErlDrvData drv_data, ErlDrvThreadData async_data) {
-	int 								response_len;
+	long 								response_len;
 	ErlDrvTermData* 		term;
-	ErlDrvTermData 			calleePid, tag;
+	ErlDrvTermData 			callee_pid, tag;
 	ErlDrvPort 					port;
 	driver_spec* 				driverBundle;
 	xsl_engine* 				provider;
 	transform_result* 	result;
 	request_context* 		context;
-	void* 							payload;		// used to process the payload
 	transform_job* 			job;				// used to repeatedly refer to the completed job 
 	DriverState					state;
-	ErlDrvTermData 			spec[4];
 	
 	// ErlDrvPort port, ErlDrvTermData receiver, ErlDrvTermData* term, int n
 	
@@ -208,40 +351,30 @@ static void ready_async(ErlDrvData drv_data, ErlDrvThreadData async_data) {
 	job		 	 			= context->job;
 	state		 			= result->status;
 	port 		 			= (ErlDrvPort)context->port;
-	calleePid 	 	= (ErlDrvTermData)context->callerPid;
+	callee_pid 	 	= (ErlDrvTermData)context->caller_pid;
 	
 	switch (state) {
 	case Ok:
-		payload = result->payload;
 		tag	= atom_result;
+		if (result->format == Text) {
+			term = make_driver_term(&port, result->payload.buffer, &tag, &response_len);
+		} else {
+			term = make_driver_term_bin(&port, ((ErlDrvBinary*)result->payload.data), &tag, &response_len);
+		}
 		break;
 	default:  // TODO: it would be better if we didn't do "everthing else is an error" here
-		payload = result->errorMessage;
 		tag = atom_error;
+		term = make_driver_term(&port, result->errorMessage, &tag, &response_len);
 	}
 	
-	spec[0] = ERL_DRV_ATOM, tag;
-	spec[1] = ERL_DRV_PORT, driver_mk_port(port);
-  //isn't this next component an implicit ErlDrvBinary and therefore requires a call to driver_free_binary?
-	if (result->format == Binary) {
-		spec[2] = ERL_DRV_BINARY, (ErlDrvBinary*)payload, (ERL_DRV_UINT, result->size);
-	} else {
-		spec[2] = ERL_DRV_BUF2BINARY, (char*)payload, strlen((char*)payload);
-	}
-	spec[4] = ERL_DRV_TUPLE, 3;
-
-  term = malloc(sizeof(spec));
-	
-	if (NULL != term) {
-		memcpy(term, &spec, sizeof(spec));
-		response_len = sizeof(spec) / sizeof(spec[0]);
-		driver_send_term(port, calleePid, term, response_len);
+	if (term != NULL) {
+		driver_send_term(port, callee_pid, term, response_len);
 	} else {
 		state = OutOfMemory;
 	}
 
 	// now the engine needs the opportunity to free up the result
-  provider->afterTransform(result);
+  provider->after_transform(result);
     
 	// cleanup time...
 	cleanup_job(job);

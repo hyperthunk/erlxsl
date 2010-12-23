@@ -71,7 +71,7 @@ extern "C" {
 	  /*
 	   * The name of the parameter (as passed to xslt).
 	   */
-	  char * name;
+	  char * key;
 	  /*
 	   * The value assigned to the parameter (as passed to xslt).
 	   */
@@ -132,26 +132,16 @@ extern "C" {
    * with some useful flags.
    */
   typedef struct {
-      /*
-       * Denotes the kind of input (e.g. buffer, stream or file based) for the data.
-       */
-      InputType inputKind;
-      /*
-       * Denotes the kind of xsl input (e.g. buffer, stream 
- 		 * or file based) for the stylesheet. */
-      InputType xslInputKind;
-      /*
-       * A pointer to the head element in a linked list of param_info structures.
-       */
-      param_info* parameters;
-      /*
-       * A pointer to the input data.
-       */
-      char * inputData;
-      /*
-       * A pointer to the stylesheet data.
-       */
-      char * stylesheetData;
+    // Denotes the kind of input (e.g. buffer, stream or file based) for the data.
+    InputType input_kind;
+    // Denotes the kind of xsl input (e.g. buffer, stream or file based) for the stylesheet.
+    InputType xsl_kind;
+    // A pointer to the head element in a linked list of param_info structures.
+    param_info* parameters;
+    // A pointer to the input data.
+    char * input;
+    // A pointer to the stylesheet data.
+    char * stylesheet;
   } transform_job;
   
   /* comms related data structures (e.g. for interacting with the emulator) */    
@@ -166,7 +156,7 @@ extern "C" {
       /* Stores the port associated with the current driver instance. */
       void* port;
       /* Stores the calling process' Pid. */
-      unsigned long callerPid;
+      unsigned long caller_pid;
       /* Stores a pointer to the current request data. */
       transform_job* job;
   } request_context;
@@ -196,7 +186,13 @@ extern "C" {
 		/* The format in which the resulting data is stored */
 		ResultFormat format;
     /* Stores the response data itself. */
-    void* payload;
+    union { 
+	    /* Maintaining our response data in a buffer. */
+	    char* buffer;
+	    /* Maintaining our response data in the *driver term format*; this
+	     is a pointer to the start of an array in the appropriate format.*/
+	    void* data;
+    } payload;
   } transform_result;
 
 /************************  THE EXTERNAL API ***********************************/
@@ -249,7 +245,7 @@ extern "C" {
 		   be set by the provider on startup */
 		InitFunc 						*initialize;
 		TransformFunc 			*transform;
-		PostTransformFunc		*afterTransform;
+		PostTransformFunc		*after_transform;
 		ShutdownFunc				*shutdown;
 		/* Generic storage location, so providers can stash whatever they need. */
     void* 							providerData;
