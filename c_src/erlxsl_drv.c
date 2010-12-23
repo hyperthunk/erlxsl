@@ -54,11 +54,11 @@ static DriverState default_initialize(void*);
 static void default_handleTransform(void*);
 static DriverState default_postHandle(void*);
 static void default_shutdown(void*);
+static void cleanup_task(void*);
 static ErlDrvData start_driver(ErlDrvPort, char*);
 static void stop_driver(ErlDrvData);
 static void outputv(ErlDrvData, ErlIOVec*);
 static void ready_async(ErlDrvData, ErlDrvThreadData);
-static void cleanup_job(transform_job*);
 static ErlDrvTermData* make_driver_term(ErlDrvPort*, char*, ErlDrvTermData*, long*);
 static ErlDrvTermData* make_driver_term_bin(ErlDrvPort*, ErlDrvBinary*, ErlDrvTermData*, long*);
 
@@ -71,9 +71,22 @@ static ErlDrvTermData* make_driver_term_bin(ErlDrvPort*, ErlDrvBinary*, ErlDrvTe
 
 /* INTERNAL DRIVER FUNCTIONS */
 
-//static void* try_driver_alloc(size_t size, void* pfree, ...) {
-	
-//}
+/*
+static void* try_driver_alloc(size_t size, void* pfree, ...) {
+	void* val = driver_alloc(size);
+	if (val == NULL) {
+		va_list ap;
+		void* p;
+		
+		va_start(ap, pfree); 
+		while ((p = va_arg(ap, void*)) != NULL) {
+			DRV_FREE(p);
+		}
+		va_end(ap);
+	}
+	return val;
+}
+*/
 
 static void init_provider(driver_spec *drv, char *buff) {
 	xsl_engine *engine = (xsl_engine*)driver_alloc(sizeof(xsl_engine));
@@ -109,24 +122,37 @@ static DriverState default_postHandle(void *result) {
 
 static void default_shutdown(void *state) {};
 
-static void cleanup_job(transform_job* job) {
+static void cleanup_task(void *async_state) {
+	request_context *ctx;
+	transform_job *job;
 	param_info *next; 
 	param_info *current;
 	
-  if (job != NULL) {
-		DRV_FREE(job->input);
-		DRV_FREE(job->stylesheet);
-    
-	  current = job->parameters;
-		while (current != NULL) {
-		  next = (param_info*)current->next;
-		  DRV_FREE(current->key);
-		  DRV_FREE(current->value);
-		  current = next;
-		}
+	transform_result* result = (transform_result*)async_state;
 	
-		DRV_FREE(job);
-  }
+	ctx = result->context;
+	job = ctx->job;
+	
+	if (ctx != NULL) {
+		if (job != NULL) {
+			DRV_FREE(job->input);
+			DRV_FREE(job->stylesheet);
+
+		  current = job->parameters;
+			while (current != NULL) {
+			  next = (param_info*)current->next;
+			  DRV_FREE(current->key);
+			  DRV_FREE(current->value);
+			  current = next;
+			}
+
+			DRV_FREE(job);
+	  }
+	
+		DRV_FREE(ctx);
+	}
+	
+	DRV_FREE(result);
 };
 
 /* makes a tagged tuple (using the driver term format) for the supplied binary payload. */
@@ -264,44 +290,19 @@ static void outputv(ErlDrvData drv_data, ErlIOVec *ev) {
 	// TODO: add support for parameters also!
 	
 	char *xml = driver_alloc((sizeof(char) * xml_len) + 1);
-	if (xml == NULL) {
-		driver_failure_atom(port, "system_limit");
-		return;
-	}
-	
 	char *xsl = driver_alloc((sizeof(char) * xsl_len) + 1);
-	if (xsl == NULL) {
-		DRV_FREE(xml);
-		driver_failure_atom(port, "system_limit");
-		return;
-	}
-	
 	transform_job *job = (transform_job*)driver_alloc(sizeof(transform_job));
-	if (job == NULL) {
-		DRV_FREE(xml);
-		DRV_FREE(xsl);
-		driver_failure_atom(port, "system_limit");
-		return;
-	}
-	
 	request_context *ctx = (request_context*)driver_alloc(sizeof(request_context));
-	if (ctx == NULL) {
-		DRV_FREE(xml);
-		DRV_FREE(xsl);
-		DRV_FREE(job);
-		driver_failure_atom(port, "system_limit");
-		return;
-	}
-	
 	transform_result *result = (transform_result*)driver_alloc(sizeof(transform_result));
-	if (result == NULL) {	
+	
+	if (xml == NULL || xsl == NULL || job == NULL || ctx == NULL) { 
 		DRV_FREE(xml);
 		DRV_FREE(xsl);
 		DRV_FREE(job);
 		DRV_FREE(ctx);
-		driver_failure_atom(port, "system_limit");
+		driver_failure_atom(port, "system_limit"); 
 		return;
-	}
+	};
 	
 	// this approach only works when we're running with SMP support! Check by calling driver_system_info()
 	// TODO: either mutex this for non-SMP systems or do a copy operation instead
@@ -321,8 +322,21 @@ static void outputv(ErlDrvData drv_data, ErlIOVec *ev) {
 	ctx->job = job;
 	result->context = ctx;
 	
-	// TODO: consider using an explicit cleanup function instead of relying solely on ready_async and engine->after_transform
-	driver_async(port, NULL, engine->transform, result, NULL); //, engine->postHandle);
+	/*
+	driver_async will call engine->transform passing result, then 
+	call ready_async followed by cleanup_task. The synchronous code
+	works something like this:
+	
+	(*a->async_invoke)(a->async_data);
+  if (async_ready(prt, a->async_data)) {
+		if (a->async_free != NULL)
+    	(*a->async_free)(a->async_data);
+  }
+
+	In SMP mode a queue is employed, but the semantics ought to remain the same 
+	*/
+	
+	driver_async(port, NULL, engine->transform, result, cleanup_task);
 };
 
 /*
@@ -377,7 +391,7 @@ static void ready_async(ErlDrvData drv_data, ErlDrvThreadData async_data) {
   provider->after_transform(result);
     
 	// cleanup time...
-	cleanup_job(job);
+	cleanup_task(job);
 	
 	if (state == OutOfMemory) {
 		driver_failure_atom(port, "system_limit");

@@ -57,7 +57,7 @@ extern "C" {
   typedef signed   char           Int8;
   typedef signed   short  int     Int16;
   // this (following) word size assumption is true in the erlang 
-// source, so we should be ok!
+	// source, so we should be ok!
   typedef signed   long   int     Int32;
   typedef signed   long   long    Int64;
   //this is platform dependant but consistent with erts
