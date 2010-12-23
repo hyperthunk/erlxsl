@@ -38,8 +38,9 @@
 -export([pack/2]).
 
 pack(Input, Stylesheet) when is_binary(Input) andalso is_binary(Stylesheet) ->
-	XmlKind = <<?BUFFER_INPUT:32>>,
-	XslKind = <<?BUFFER_INPUT:32>>,
+	%%XmlKind = <<2:32>>,
+	%%XslKind = <<2:32>>,
 	InputLen = size(Input),
 	XslLen = size(Stylesheet),
-	[XmlKind, XslKind, <<InputLen:32>>, <<XslLen:32>>, <<0:32>>, Input, Stylesheet].
+	%% [?PUT, <<Len:32>>, Key, Preamble, Value]
+	[<<2:32>>, <<2:32>>, <<InputLen:32>>, <<XslLen:32>>, <<0:32>>, Input, Stylesheet].

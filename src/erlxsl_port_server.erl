@@ -37,7 +37,7 @@
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
 %% Public API Exports
--export([start/0, start_link/0]).
+-export([start/0, start_link/0, transform/2]).
 
 -define(SERVER, ?MODULE).
 -define(PORT_INIT, 9).		%% magic number indicating that the port should initialize itself 
@@ -48,6 +48,9 @@ start() ->
 
 start_link() ->
 	gen_server:start_link(?SERVER, [], []).
+
+transform(Input, Xsl) ->
+	gen_server:call(?SERVER, {transform, Input, Xsl}).
 
 %% gen_server api
 init([]) ->
@@ -62,11 +65,20 @@ init([]) ->
 			init_driver(Config, Provider)
 	end.
 
+handle_call({transform, Input, Xsl}, _From, State) ->
+	Port = proplists:get_value(port, State),
+	erlxsl_fast_log:info("hitting port ~p~n", [Port]),
+	port_command(Port, erlxsl_marshall:pack(Input, Xsl)),
+	erlxsl_fast_log:info("awaiting port response ~p~n", [Port]),
+	receive 
+		Data -> {reply, Data}
+	after 10000 -> timeout
+	end;	
 handle_call(_Msg, _From, State) ->
 	{noreply, State}.
 
-handle_cast({transform, Input, Stylesheet}, State) ->
-	handle_transform(Input, Stylesheet, State),
+handle_cast({transform, Input, Stylesheet, Sender}, State) ->
+	handle_transform(Input, Stylesheet, State, Sender),
 	{noreply, State};
 handle_cast(stop, State) ->
 	{stop, shutdown, State};
@@ -88,14 +100,13 @@ code_change(_OldVsn, State, _Extra) ->
 
 %% private api
     
-handle_transform(Input, Stylesheet, State) ->
-	Controller = self(),
+handle_transform(Input, Stylesheet, State, Sender) ->
 	Port = proplists:get_value(port, State),
 	spawn_link(
 		fun() -> 
 			port_command(Port, erlxsl_marshall:pack(Input, Stylesheet)),
 			receive 
-				Data -> Controller ! {port_message, Data}
+				Data -> Sender ! {port_message, Data}
 			end
 		end
 	).

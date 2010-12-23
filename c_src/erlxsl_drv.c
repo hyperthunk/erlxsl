@@ -297,6 +297,8 @@ static void
 outputv(ErlDrvData drv_data, ErlIOVec *ev) {
 	char *error_msg;
 
+	fprintf(stderr, "in outputv = %i\n", 1);	
+
 	driver_spec *d = (driver_spec*)drv_data;
 	ErlDrvPort port = (ErlDrvPort)d->port;
 	ErlDrvTermData callee_pid = driver_caller(port);
@@ -313,10 +315,15 @@ outputv(ErlDrvData drv_data, ErlIOVec *ev) {
 	
 	int offset = 1;
 	int xml_kind = READ_Int32(&(bin->orig_bytes[++offset]));
+	fprintf(stderr, "xml kind = %i\n", xml_kind);
 	int xsl_kind = READ_Int32(&(bin->orig_bytes[++offset]));
+	fprintf(stderr, "xsl kind = %i\n", xsl_kind);
 	int xml_len = READ_Int32(&(bin->orig_bytes[++offset]));
+	fprintf(stderr, "xml len = %i\n", xml_len);
 	int xsl_len = READ_Int32(&(bin->orig_bytes[++offset]));
+	fprintf(stderr, "xsl len = %i\n", xsl_len);	
 	int param_count = READ_Int32(&(bin->orig_bytes[++offset]));
+	fprintf(stderr, "param count = %i\n", param_count);	
 	
 	if (xml_len > (bin_size - 5)) {
 		// NB: I'm being lazy an reusing bin_size as the term length parameter here

@@ -45,7 +45,7 @@ start() ->
 
 start(_StartType, _StartArgs) ->
   {ok, Pid} = erlxsl_sup:start_link(),
-	erlxsl_fast_log:info("ALL DONE!"),
+	erlxsl_fast_log:info("erlxsl supervisor is up..."),
 	{ok, Pid}.
 
 stop(_State) ->

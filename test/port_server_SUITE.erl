@@ -53,7 +53,13 @@ driver_startup(_) ->
 	%%erlxsl_port_server:transform([{driver, "test_engine"}]).
 	%% application:start(sasl),
 	%% ct:pal("hello", []),
-	erlxsl_app:start().
+	{ok, LP} = erlxsl_fast_log:start(),
+	{ok, Pid} = erlxsl_port_server:start(),
+	X = gen_server:call(Pid, {transform, <<"<input />">>, <<"<output />">>}),
+	%% X = erlxsl_port_server:transform(<<"<input />">>, <<"<output />">>),
+	%% ct:pal("X = ~p~n", [X]),
+	ok.
+	
 
 
 
