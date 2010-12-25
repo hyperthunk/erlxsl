@@ -39,6 +39,7 @@
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
 -include("../include/test.hrl").
+-include("../include/erlxsl.hrl").
 
 -define(SLAVE, esmt_test_slave).
 -define(PORT_HINT, 10100).
@@ -57,7 +58,7 @@ driver_startup(_) ->
 	{ok, Pid} = erlxsl_port_server:start(),
 	X = gen_server:call(Pid, {transform, <<"<input />">>, <<"<output />">>}),
 	%% X = erlxsl_port_server:transform(<<"<input />">>, <<"<output />">>),
-	%% ct:pal("X = ~p~n", [X]),
+	ct:pal("X = ~p~n", [X]),
 	ok.
 	
 

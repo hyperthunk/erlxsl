@@ -33,6 +33,8 @@
 
 -behaviour(gen_server).
 
+-include("erlxsl.hrl").
+
 %% OTP Exports
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
@@ -68,17 +70,20 @@ init([]) ->
 handle_call({transform, Input, Xsl}, _From, State) ->
 	Port = proplists:get_value(port, State),
 	erlxsl_fast_log:info("hitting port ~p~n", [Port]),
-	port_command(Port, erlxsl_marshall:pack(Input, Xsl)),
+	port_command(Port, erlxsl_marshall:pack(?BUFFER_INPUT, ?BUFFER_INPUT, Input, Xsl)),
 	erlxsl_fast_log:info("awaiting port response ~p~n", [Port]),
 	receive 
-		Data -> {reply, Data}
-	after 10000 -> timeout
+		Data ->
+			io:format("Data Arrived! ~p~n", [Data]), 
+			{reply, Data, State}
+	after 10000 -> {reply, timeout, State}
 	end;	
 handle_call(_Msg, _From, State) ->
 	{noreply, State}.
 
 handle_cast({transform, Input, Stylesheet, Sender}, State) ->
-	handle_transform(Input, Stylesheet, State, Sender),
+	handle_transform(?BUFFER_INPUT, ?BUFFER_INPUT, 
+		Input, Stylesheet, State, Sender),
 	{noreply, State};
 handle_cast(stop, State) ->
 	{stop, shutdown, State};
@@ -100,11 +105,12 @@ code_change(_OldVsn, State, _Extra) ->
 
 %% private api
     
-handle_transform(Input, Stylesheet, State, Sender) ->
+handle_transform(InType, XslType, Input, Stylesheet, State, Sender) ->
 	Port = proplists:get_value(port, State),
 	spawn_link(
 		fun() -> 
-			port_command(Port, erlxsl_marshall:pack(Input, Stylesheet)),
+			port_command(Port, 
+				erlxsl_marshall:pack(InType, XslType, Input, Stylesheet)),
 			receive 
 				Data -> Sender ! {port_message, Data}
 			end

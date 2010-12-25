@@ -33,45 +33,7 @@
  *
  */
 
-#include <erl_driver.h>
-#include <ei.h>
-#include <stdarg.h>
-#include "erlxsl_api.h"
-
-/* INTERNAL DATA & DATA STRUCTURES */
-
-typedef struct {
-  void*  port;
-	xsl_engine* provider;
-} driver_spec;
-
-static ErlDrvTermData atom_result; 
-static ErlDrvTermData atom_error;
-
-/* FORWARD DEFS */
-
-static void init_provider(driver_spec*, char *);
-static DriverState default_initialize(void*);
-static void default_handleTransform(void*);
-static DriverState default_postHandle(void*);
-static void default_shutdown(void*);
-static void cleanup_task(void*);
-static ErlDrvData start_driver(ErlDrvPort, char*);
-static void stop_driver(ErlDrvData);
-static int call(ErlDrvData, unsigned int, char*, int, char**, int, unsigned int*);
-static void outputv(ErlDrvData, ErlIOVec*);
-static void ready_async(ErlDrvData, ErlDrvThreadData);
-static ErlDrvTermData* make_driver_term(ErlDrvPort*, char*, ErlDrvTermData*, long*);
-static ErlDrvTermData* make_driver_term_bin(ErlDrvPort*, ErlDrvBinary*, ErlDrvTermData*, long*);
-
-#define INIT_COMMAND_MAGIC 9
-
-#define DRV_FREE(x) if (NULL != x) driver_free(x)
-
-#define READ_Int32(s)  ((((int)(((unsigned char*) (s))[0]))  << 24) | \
-                        (((int)(((unsigned char*) (s))[1]))  << 16) | \
-                        (((int)(((unsigned char*) (s))[2]))  << 8)  | \
-                        (((int)(((unsigned char*) (s))[3]))))
+#include "erlxsl_drv.h"
 
 /* INTERNAL DRIVER FUNCTIONS */
 
@@ -117,8 +79,10 @@ default_handleTransform(void *result) {
   transform_result *res = (transform_result*)result;
 	transform_job *job = (res->context)->job;
 	char *output = driver_alloc(sizeof(char) * ((strlen(job->input) + strlen(job->stylesheet)) + 1)); 
+	fprintf(stderr, "alloc %s\n", "ok");	
 	strcpy(output, job->input);
-	strcpy(output, job->stylesheet);
+	strcat(output, job->stylesheet);
+	fprintf(stderr, "copy complete: %s\n", output);	
   res->payload.buffer = output;
   res->status = Ok;
 };
@@ -307,39 +271,42 @@ outputv(ErlDrvData drv_data, ErlIOVec *ev) {
 	// assert(ev->binv[1] != NULL)	
 	
 	int bin_size = bin->orig_size;
-	if (bin_size < 5) {
+	Int32 offset = (Int32)(sizeof(input_spec_hdr) + sizeof(payload_size_hdr));
+	
+	if (bin_size < offset) {
 		error_msg = "InconsistentInputHeaders: driver protocol not recognised.";
 		driver_output2(port, error_msg, strlen(error_msg), NULL, 0);
 		return;
 	}
 	
-	int offset = 1;
-	int xml_kind = READ_Int32(&(bin->orig_bytes[++offset]));
-	fprintf(stderr, "xml kind = %i\n", xml_kind);
-	int xsl_kind = READ_Int32(&(bin->orig_bytes[++offset]));
-	fprintf(stderr, "xsl kind = %i\n", xsl_kind);
-	int xml_len = READ_Int32(&(bin->orig_bytes[++offset]));
-	fprintf(stderr, "xml len = %i\n", xml_len);
-	int xsl_len = READ_Int32(&(bin->orig_bytes[++offset]));
-	fprintf(stderr, "xsl len = %i\n", xsl_len);	
-	int param_count = READ_Int32(&(bin->orig_bytes[++offset]));
-	fprintf(stderr, "param count = %i\n", param_count);	
+	const char *buffer = &(bin->orig_bytes[0]);
+	const input_spec_hdr *hspec = (const input_spec_hdr* const)buffer;
+	const payload_size_hdr *hsoffset = (const payload_size_hdr*)(hspec + 1);
+	payload_size_hdr hsize = *hsoffset;
 	
-	if (xml_len > (bin_size - 5)) {
-		// NB: I'm being lazy an reusing bin_size as the term length parameter here
+	hsoffset++;
+	buffer = (const char*)hsoffset;
+	
+	fprintf(stderr, "spec xml kind = %i\n", (Int8)(hspec->input_kind));
+	fprintf(stderr, "spec xsl kind = %i\n", (Int8)(hspec->xsl_kind));	
+	fprintf(stderr, "spec param count = %i\n", (Int16)(hspec->param_grp_arity));
+	fprintf(stderr, "input size = %i\n", (Int32)(hsize.input_size));
+	fprintf(stderr, "xsl size = %i\n", (Int32)(hsize.xsl_size));	
+	
+	if (hsize.input_size > (bin_size - offset)) {
 		error_msg = "BufferSizeMismatch: input length exceeds stated buffer size.";
 		driver_output2(port, error_msg, strlen(error_msg), NULL, 0);
 		return;
 	}
-	if (xsl_len > (bin_size - (5 + xml_len))) {
+	if (hsize.xsl_size > (bin_size - (offset + hsize.input_size))) {
 		error_msg = "BufferSizeMismatch: stylesheet length exceeds stated buffer size.";
 		driver_output2(port, error_msg, strlen(error_msg), NULL, 0);
 		return;
 	}
 	// TODO: add support for parameters also!
 	
-	char *xml = driver_alloc((sizeof(char) * xml_len) + 1);
-	char *xsl = driver_alloc((sizeof(char) * xsl_len) + 1);
+	char *xml = driver_alloc((sizeof(char) * hsize.input_size) + 1);
+	char *xsl = driver_alloc((sizeof(char) * hsize.xsl_size) + 1);
 	transform_job *job = (transform_job*)driver_alloc(sizeof(transform_job));
 	request_context *ctx = (request_context*)driver_alloc(sizeof(request_context));
 	transform_result *result = (transform_result*)driver_alloc(sizeof(transform_result));
@@ -358,12 +325,15 @@ outputv(ErlDrvData drv_data, ErlIOVec *ev) {
 	// driver_binary_inc_refc(bin);
 	
 	// we save the copying until we're sure it'll take place...
-	strncpy(xml, &bin->orig_bytes[offset], xml_len);
-	offset += xml_len;
-	strncpy(xsl, &bin->orig_bytes[offset], xsl_len);
+	strncpy(xml, &bin->orig_bytes[offset], hsize.input_size);
+	offset += hsize.input_size;
+	strncpy(xsl, &bin->orig_bytes[offset], hsize.xsl_size);
 	
-	job->input_kind = xml_kind;
-	job->xsl_kind = xsl_kind;
+	fprintf(stderr, "xml = %s\n", xml);
+	fprintf(stderr, "xsl = %s\n", xsl);
+	
+	job->input_kind = (InputType)hspec->input_kind;
+	job->xsl_kind = (InputType)hspec->xsl_kind;
 	job->input = xml;
 	job->stylesheet = xsl;
 	ctx->port = port;
@@ -406,6 +376,8 @@ ready_async(ErlDrvData drv_data, ErlDrvThreadData async_data) {
 	DriverState					state;
 	
 	// ErlDrvPort port, ErlDrvTermData receiver, ErlDrvTermData* term, int n
+	
+	fprintf(stderr, "processing %s\n", "ready_async");	
 	
 	driverBundle 	= (driver_spec*)drv_data;
 	provider	 		= (xsl_engine*)driverBundle->provider;
