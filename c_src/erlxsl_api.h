@@ -30,6 +30,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <stdbool.h>
 
 #ifndef _ERLXSL_H
@@ -51,17 +52,13 @@ extern "C" {
 	
   /* Data Types & Aliasing */
   
-  typedef unsigned char           UInt8;
-  typedef unsigned short  int     UInt16;
-  typedef unsigned short  int     UInt32;
-  typedef signed   char           Int8;
-  typedef signed   short  int     Int16;
-  // this (following) word size assumption is true in the erlang 
-	// source, so we should be ok!
-  typedef signed   long   int     Int32;
-  typedef signed   long   long    Int64;
-  //this is platform dependant but consistent with erts
-  typedef unsigned long           ULong;
+  typedef uint8_t      	UInt8;
+  typedef uint16_t     	UInt16;
+  typedef uint32_t     	UInt32;
+  typedef int8_t       	Int8;
+  typedef int16_t     	Int16;
+  typedef int32_t     	Int32;
+  typedef int64_t    		Int64;
   
   /*
    * Packages information about a parameter (its name and value)

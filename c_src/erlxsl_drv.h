@@ -102,3 +102,12 @@ static ErlDrvTermData* make_driver_term_bin(ErlDrvPort*, ErlDrvBinary*, ErlDrvTe
                         (((int)(((unsigned char*) (s))[1]))  << 16) | \
                         (((int)(((unsigned char*) (s))[2]))  << 8)  | \
                         (((int)(((unsigned char*) (s))[3]))))
+
+#define ERROR(str, ...)  \
+    LOG(stderr, str, ##__VA_ARGS__);
+
+#define INFO(str, ...)  \
+    LOG(stdout, str, ##__VA_ARGS__);
+
+#define LOG(stream, str, ...)  \
+    fprintf(stream, str, ##__VA_ARGS__);

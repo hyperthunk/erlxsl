@@ -46,13 +46,20 @@
 
 %% public api
 start() ->
-	gen_server:start(?SERVER, [], []).
+	gen_server:start({local,?SERVER}, ?SERVER, [], []).
 
 start_link() ->
-	gen_server:start_link(?SERVER, [], []).
+	gen_server:start_link({local,?SERVER}, ?SERVER, [], []).
 
 transform(Input, Xsl) ->
-	gen_server:call(?SERVER, {transform, Input, Xsl}).
+	gen_server:cast(?SERVER, {transform, Input, Xsl, self()}),
+	receive 
+		{result,_,Result} ->
+			Result;
+		{data, Data} ->
+			{error, Data};
+		Other -> Other
+	end.
 
 %% gen_server api
 init([]) ->
@@ -69,12 +76,9 @@ init([]) ->
 
 handle_call({transform, Input, Xsl}, _From, State) ->
 	Port = proplists:get_value(port, State),
-	erlxsl_fast_log:info("hitting port ~p~n", [Port]),
 	port_command(Port, erlxsl_marshall:pack(?BUFFER_INPUT, ?BUFFER_INPUT, Input, Xsl)),
-	erlxsl_fast_log:info("awaiting port response ~p~n", [Port]),
 	receive 
 		Data ->
-			io:format("Data Arrived! ~p~n", [Data]), 
 			{reply, Data, State}
 	after 10000 -> {reply, timeout, State}
 	end;	
@@ -82,6 +86,7 @@ handle_call(_Msg, _From, State) ->
 	{noreply, State}.
 
 handle_cast({transform, Input, Stylesheet, Sender}, State) ->
+	erlxsl_fast_log:info("handle_cast sender = ~p~n", [Sender]),
 	handle_transform(?BUFFER_INPUT, ?BUFFER_INPUT, 
 		Input, Stylesheet, State, Sender),
 	{noreply, State};
@@ -107,12 +112,16 @@ code_change(_OldVsn, State, _Extra) ->
     
 handle_transform(InType, XslType, Input, Stylesheet, State, Sender) ->
 	Port = proplists:get_value(port, State),
-	spawn_link(
+	erlxsl_fast_log:info("handle_transform sender = ~p~n", [Sender]),	
+	spawn(
 		fun() -> 
-			port_command(Port, 
-				erlxsl_marshall:pack(InType, XslType, Input, Stylesheet)),
+			erlxsl_fast_log:info("handle_transform-fun sender = ~p~n", [Sender]),
+			port_command(Port, erlxsl_marshall:pack(InType, XslType, Input, Stylesheet)),
+			ct:pal("awaiting response from port ~p~n", [Port]),
 			receive 
-				Data -> Sender ! {port_message, Data}
+				Data -> Sender ! Data
+			after 3000
+				-> Sender ! timeout
 			end
 		end
 	).

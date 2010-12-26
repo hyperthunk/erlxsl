@@ -56,9 +56,17 @@ driver_startup(_) ->
 	%% ct:pal("hello", []),
 	{ok, LP} = erlxsl_fast_log:start(),
 	{ok, Pid} = erlxsl_port_server:start(),
-	X = gen_server:call(Pid, {transform, <<"<input />">>, <<"<output />">>}),
+	ct:pal("whereis(erlxsl_port_server) ~p~n", [whereis(erlxsl_port_server)]),
+	gen_server:cast(Pid, {transform, <<"<input />">>, <<"<output />">>, self()}),
+	%% erlxsl_port_server:transform(<<"<input />">>, <<"<output />">>),
 	%% X = erlxsl_port_server:transform(<<"<input />">>, <<"<output />">>),
+	X = receive 
+		Data -> Data
+	after 10000 ->
+		error
+	end,
 	ct:pal("X = ~p~n", [X]),
+	?assertMatch({result,Port,<<"<input /><output />">>}, X),
 	ok.
 	
 

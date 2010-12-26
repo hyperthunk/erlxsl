@@ -71,29 +71,33 @@ init_provider(driver_spec *drv, char *buff) {
 
 static DriverState 
 default_initialize(void *state) {
+	INFO("default_initialize\n");	
 	return Ok;
 };
 
 static void 
 default_handleTransform(void *result) {
+	INFO("default_handleTransform\n");	
   transform_result *res = (transform_result*)result;
 	transform_job *job = (res->context)->job;
 	char *output = driver_alloc(sizeof(char) * ((strlen(job->input) + strlen(job->stylesheet)) + 1)); 
-	fprintf(stderr, "alloc %s\n", "ok");	
 	strcpy(output, job->input);
 	strcat(output, job->stylesheet);
-	fprintf(stderr, "copy complete: %s\n", output);	
+	res->format = Text;
   res->payload.buffer = output;
   res->status = Ok;
 };
 
 static DriverState 
 default_postHandle(void *result) {
+	INFO("default_postHandle\n");
   return Ok;
 };
 
 static void 
-default_shutdown(void *state) {};
+default_shutdown(void *state) {
+	INFO("default_shutdown\n");
+};
 
 static void 
 cleanup_task(void *async_state) {
@@ -109,23 +113,27 @@ cleanup_task(void *async_state) {
 	
 	if (ctx != NULL) {
 		if (job != NULL) {
+			INFO("cleanup input\n");			
 			DRV_FREE(job->input);
+			INFO("cleanup stylesheet\n");
 			DRV_FREE(job->stylesheet);
 
 		  current = job->parameters;
+			INFO("cleanup parameters\n");
 			while (current != NULL) {
+				INFO("current wasn't null!?\n");			
 			  next = (param_info*)current->next;
 			  DRV_FREE(current->key);
 			  DRV_FREE(current->value);
 			  current = next;
 			}
-
+			INFO("cleanup job\n");
 			DRV_FREE(job);
 	  }
-	
+		INFO("cleanup contet\n");
 		DRV_FREE(ctx);
 	}
-	
+	INFO("cleanup result!\n");		
 	DRV_FREE(result);
 };
 
@@ -176,7 +184,7 @@ make_driver_term(ErlDrvPort *port, char *payload, ErlDrvTermData *tag, long *len
 	spec[7] = ERL_DRV_TUPLE; 
 	spec[8] = 3;
 
-  term = malloc(sizeof(spec));
+  term = driver_alloc(sizeof(spec));
 	if (NULL != term) {
 		memcpy(term, &spec, sizeof(spec));
 		*length = sizeof(spec) / sizeof(spec[0]);
@@ -250,7 +258,7 @@ call(ErlDrvData drv_data, unsigned int command, char *buf,
   p = driver_alloc(size + 1); 
   ei_decode_string(buf, &index, p);
 	
-	fprintf(stderr, "Driver received provider init command %s\n", p);
+	INFO("Driver received provider init command %s\n", p);
 	DRV_FREE(p);
 	ei_encode_version(*rbuf, &rindex);
 	ei_encode_atom(*rbuf, &rindex, "configured");
@@ -260,11 +268,8 @@ call(ErlDrvData drv_data, unsigned int command, char *buf,
 static void 
 outputv(ErlDrvData drv_data, ErlIOVec *ev) {
 	char *error_msg;
-
-	fprintf(stderr, "in outputv = %i\n", 1);	
-
 	driver_spec *d = (driver_spec*)drv_data;
-	ErlDrvPort port = (ErlDrvPort)d->port;
+	ErlDrvPort port = (ErlDrvPort)d->port;	
 	ErlDrvTermData callee_pid = driver_caller(port);
 	ErlDrvBinary *bin = ev->binv[1];
 	xsl_engine *engine = d->provider;
@@ -287,11 +292,13 @@ outputv(ErlDrvData drv_data, ErlIOVec *ev) {
 	hsoffset++;
 	buffer = (const char*)hsoffset;
 	
-	fprintf(stderr, "spec xml kind = %i\n", (Int8)(hspec->input_kind));
-	fprintf(stderr, "spec xsl kind = %i\n", (Int8)(hspec->xsl_kind));	
-	fprintf(stderr, "spec param count = %i\n", (Int16)(hspec->param_grp_arity));
-	fprintf(stderr, "input size = %i\n", (Int32)(hsize.input_size));
-	fprintf(stderr, "xsl size = %i\n", (Int32)(hsize.xsl_size));	
+	/*
+	INFO("spec xml kind = %i\n", (Int8)(hspec->input_kind));
+	INFO("spec xsl kind = %i\n", (Int8)(hspec->xsl_kind));	
+	INFO("spec param count = %i\n", (Int16)(hspec->param_grp_arity));
+	INFO("input size = %i\n", (Int32)(hsize.input_size));
+	INFO("xsl size = %i\n", (Int32)(hsize.xsl_size));
+	*/
 	
 	if (hsize.input_size > (bin_size - offset)) {
 		error_msg = "BufferSizeMismatch: input length exceeds stated buffer size.";
@@ -377,8 +384,6 @@ ready_async(ErlDrvData drv_data, ErlDrvThreadData async_data) {
 	
 	// ErlDrvPort port, ErlDrvTermData receiver, ErlDrvTermData* term, int n
 	
-	fprintf(stderr, "processing %s\n", "ready_async");	
-	
 	driverBundle 	= (driver_spec*)drv_data;
 	provider	 		= (xsl_engine*)driverBundle->provider;
   port		 	 		= (ErlDrvPort)driverBundle->port;
@@ -387,7 +392,7 @@ ready_async(ErlDrvData drv_data, ErlDrvThreadData async_data) {
 	job		 	 			= context->job;
 	state		 			= result->status;
 	port 		 			= (ErlDrvPort)context->port;
-	callee_pid 	 	= (ErlDrvTermData)context->caller_pid;
+	callee_pid 	 	= (ErlDrvTermData)context->caller_pid;	
 	
 	switch (state) {
 	case Ok:
@@ -406,16 +411,19 @@ ready_async(ErlDrvData drv_data, ErlDrvThreadData async_data) {
 	if (term != NULL) {
 		driver_send_term(port, callee_pid, term, response_len);
 	} else {
+		ERROR("Driver Out Of Memory!\n")
 		state = OutOfMemory;
 	}
 
 	// now the engine needs the opportunity to free up the result
+	INFO("provider handoff: after_transform\n");		
   provider->after_transform(result);
     
 	// cleanup time...
-	cleanup_task(job);
+	cleanup_task(result);
 	
 	if (state == OutOfMemory) {
+		ERROR("Driver Out Of Memory!\n");
 		driver_failure_atom(port, "system_limit");
 	}
 	// TODO: and the other failure conditions?
