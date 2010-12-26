@@ -28,7 +28,7 @@
 -behaviour(application).
 
 %% Application callbacks
--export([start/0, start/2, stop/1]).
+-export([start/0, start/2, stop/0, stop/1]).
 
 
 %%%
@@ -38,6 +38,9 @@ start() ->
 	%% ct:pal("requesting app startup", []),
   application:start(sasl),
 	application:start(erlxsl).
+
+stop() ->
+	application:stop(erlxsl).
 
 %% ===================================================================
 %% Application callbacks

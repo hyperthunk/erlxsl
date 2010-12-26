@@ -50,23 +50,16 @@
 all() ->
     ?EXPORT_TESTS(?MODULE).
 
+init_per_suite(C) ->
+	erlxsl_app:start(),
+	C.
+
+end_per_suite(_) ->
+	erlxsl_app:stop().
+
 driver_startup(_) ->
-	%%erlxsl_port_server:transform([{driver, "test_engine"}]).
-	%% application:start(sasl),
-	%% ct:pal("hello", []),
-	{ok, LP} = erlxsl_fast_log:start(),
-	{ok, Pid} = erlxsl_port_server:start(),
-	ct:pal("whereis(erlxsl_port_server) ~p~n", [whereis(erlxsl_port_server)]),
-	gen_server:cast(Pid, {transform, <<"<input />">>, <<"<output />">>, self()}),
-	%% erlxsl_port_server:transform(<<"<input />">>, <<"<output />">>),
-	%% X = erlxsl_port_server:transform(<<"<input />">>, <<"<output />">>),
-	X = receive 
-		Data -> Data
-	after 10000 ->
-		error
-	end,
-	ct:pal("X = ~p~n", [X]),
-	?assertMatch({result,Port,<<"<input /><output />">>}, X),
+	X = erlxsl_port_server:transform(<<"<input />">>, <<"<output />">>),
+	?assertMatch(<<"<input /><output />">>, X),
 	ok.
 	
 

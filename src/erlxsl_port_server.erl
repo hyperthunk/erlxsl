@@ -39,17 +39,25 @@
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
 %% Public API Exports
--export([start/0, start_link/0, transform/2]).
+-export([start/0, start_link/0, stop/0, transform/2]).
 
 -define(SERVER, ?MODULE).
 -define(PORT_INIT, 9).		%% magic number indicating that the port should initialize itself 
 
 %% public api
+
+%% @doc starts erlxsl_port_server with default options. 
+%% NB: this means that the XSLT provider will be a test stub!
 start() ->
 	gen_server:start({local,?SERVER}, ?SERVER, [], []).
 
+%% @doc starts erlxsl_port_server with default options. 
+%% NB: this means that the XSLT provider will be a test stub!
 start_link() ->
 	gen_server:start_link({local,?SERVER}, ?SERVER, [], []).
+
+stop() ->
+	gen_server:cast(?SERVER, stop).
 
 transform(Input, Xsl) ->
 	gen_server:cast(?SERVER, {transform, Input, Xsl, self()}),
@@ -65,7 +73,7 @@ transform(Input, Xsl) ->
 init([]) ->
 	erlxsl_fast_log:info("initializing port_server...~n"),
 	Config = application:get_all_env(erlxsl),
-	%% io:format("APPCONFIG [~p]~n", [Config]),
+	erlxsl_fast_log:info("app-config [~p]~n", [Config]),
   Options = proplists:get_value(driver_options, Config, [{driver, "default_provider"}]),
 	case proplists:get_value(driver, Options) of 
 		undefined -> {stop, {config_error, "No XSLT Engine Specified."}};
@@ -74,14 +82,6 @@ init([]) ->
 			init_driver(Config, Provider)
 	end.
 
-handle_call({transform, Input, Xsl}, _From, State) ->
-	Port = proplists:get_value(port, State),
-	port_command(Port, erlxsl_marshall:pack(?BUFFER_INPUT, ?BUFFER_INPUT, Input, Xsl)),
-	receive 
-		Data ->
-			{reply, Data, State}
-	after 10000 -> {reply, timeout, State}
-	end;	
 handle_call(_Msg, _From, State) ->
 	{noreply, State}.
 
@@ -96,14 +96,13 @@ handle_cast(_, State) ->
 	{noreply, State}.
 
 handle_info(Unknown, State) ->
-	erlxsl_fast_log:info("Port server received unknown message ~p~n", [Unknown]),
+	erlxsl_fast_log:warn("Port server received unknown message ~p~n", [Unknown]),
 	{noreply, State}.
 
 terminate(Reason, State) ->
-	erlxsl_fast_log:info("Terminating due to [~p]~n", [Reason]),
 	Driver = proplists:get_value(driver, State, "erlxsl_drv"),
-	catch erl_ddll:unload_driver(Driver),
-	ok.
+	Unload = erl_ddll:unload_driver(Driver),
+	erlxsl_fast_log:info("Terminating [~p] - driver unload [~p]~n", [Reason, Unload]).
 
 code_change(_OldVsn, State, _Extra) ->
 	{ok, State}.
@@ -112,16 +111,11 @@ code_change(_OldVsn, State, _Extra) ->
     
 handle_transform(InType, XslType, Input, Stylesheet, State, Sender) ->
 	Port = proplists:get_value(port, State),
-	erlxsl_fast_log:info("handle_transform sender = ~p~n", [Sender]),	
 	spawn(
 		fun() -> 
-			erlxsl_fast_log:info("handle_transform-fun sender = ~p~n", [Sender]),
 			port_command(Port, erlxsl_marshall:pack(InType, XslType, Input, Stylesheet)),
-			ct:pal("awaiting response from port ~p~n", [Port]),
 			receive 
 				Data -> Sender ! Data
-			after 3000
-				-> Sender ! timeout
 			end
 		end
 	).

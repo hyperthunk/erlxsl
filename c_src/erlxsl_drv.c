@@ -216,6 +216,7 @@ start_driver(ErlDrvPort port, char *buff) {
 		return ERL_DRV_ERROR_GENERAL; // TODO: use ERL_DRV_ERROR_ERRNO and provide out-of-memory info
 	}
 	
+	INFO("provider handoff: initialize\n");			
 	DriverState state = (d->provider)->initialize(d);
 	if (state == Ok) {
 		return (ErlDrvData)d;
@@ -231,6 +232,7 @@ stop_driver(ErlDrvData drv_data) {
 	ErlDrvPort port = (ErlDrvPort)d->port;
 	xsl_engine *engine = d->provider;
 	void *state = &port;
+	INFO("provider handoff: shutdown\n");			
 	engine->shutdown(state);
 
   // driver cleanup
@@ -362,6 +364,7 @@ outputv(ErlDrvData drv_data, ErlIOVec *ev) {
 	In SMP mode a queue is employed, but the semantics ought to remain the same 
 	*/
 	
+	INFO("provider handoff: transform\n");			
 	driver_async(port, NULL, engine->transform, result, cleanup_task);
 };
 
