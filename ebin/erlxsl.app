@@ -13,6 +13,7 @@
   {applications,[kernel,stdlib,sasl]},
   {env,[
 	{driver_options, [
-		{driver, "default_provider"}
+		{engine, "default_provider"},
+		{driver, "erlxsl_drv"}
 	]}
   ]}]}.
