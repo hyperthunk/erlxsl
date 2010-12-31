@@ -51,6 +51,18 @@ all() ->
     ?EXPORT_TESTS(?MODULE).
 
 init_per_suite(C) ->
+  BaseDir  = filename:rootname(filename:dirname(filename:absname(code:which(?MODULE))), "test"),
+  PrivDir = filename:join(BaseDir, "priv"),
+  %% ?config(priv_dir, C),
+	AppSpec = ct:get_config(test_app_config),
+	{application, erlxsl, Conf} = AppSpec, 
+	{env, Env} = lists:keyfind(env, 1, Conf),
+	{driver_options, Opts} = lists:keyfind(driver_options, 1, Env),
+  UpdatedOpts = lists:keyreplace(load_path, 1, Opts, {load_path, PrivDir}),
+	UpdatedEnv = lists:keyreplace(driver_options, 1, Env, {driver_options, UpdatedOpts}),
+	UpdatedConf = lists:keyreplace(env, 1, Conf, {env, UpdatedEnv}),
+  TestAppSpec = {application, erlxsl, UpdatedConf},
+	application:load(TestAppSpec),
 	erlxsl_app:start(),
 	C.
 

@@ -32,7 +32,7 @@
 %% @doc  erlxsl marshall tests
 %%
 
--module(marshal_SUITE).
+-module(marshall_SUITE).
 -author('Tim Watson <watson.timothy@gmail.com>').
 -compile(export_all).
 

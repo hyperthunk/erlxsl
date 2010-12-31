@@ -39,22 +39,28 @@
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
 %% Public API Exports
--export([start/0, start_link/0, stop/0, transform/2]).
+-export([start/0, start_link/0, start/1, start_link/1, stop/0, transform/2]).
 
 -define(SERVER, ?MODULE).
 -define(PORT_INIT, 9).		%% magic number indicating that the port should initialize itself 
 
 %% public api
 
-%% @doc starts erlxsl_port_server with default options. 
-%% NB: this means that the XSLT provider will be a test stub!
 start() ->
-	gen_server:start({local,?SERVER}, ?SERVER, [], []).
+  start(application:get_all_env(erlxsl)).
 
 %% @doc starts erlxsl_port_server with default options. 
 %% NB: this means that the XSLT provider will be a test stub!
+start(Config) ->
+	gen_server:start({local,?SERVER}, ?SERVER, Config, []).
+
 start_link() ->
-	gen_server:start_link({local,?SERVER}, ?SERVER, [], []).
+  start_link(application:get_all_env(erlxsl)).
+
+%% @doc starts erlxsl_port_server with default options. 
+%% NB: this means that the XSLT provider will be a test stub!
+start_link(Config) ->
+	gen_server:start_link({local,?SERVER}, ?SERVER, Config, []).
 
 stop() ->
 	gen_server:cast(?SERVER, stop).
@@ -70,11 +76,9 @@ transform(Input, Xsl) ->
 	end.
 
 %% gen_server api
-init([]) ->
-	erlxsl_fast_log:info("initializing port_server...~n"),
-	Config = application:get_all_env(erlxsl),
-	erlxsl_fast_log:info("app-config [~p]~n", [Config]),
-  Options = proplists:get_value(driver_options, Config, [{driver, "default_provider"}]),
+init(Config) ->
+	erlxsl_fast_log:info("initializing port_server with config [~p]~n", [Config]),
+	Options = proplists:get_value(driver_options, Config, [{driver, "default_provider"}]),
 	case proplists:get_value(driver, Options) of 
 		undefined -> {stop, {config_error, "No XSLT Engine Specified."}};
 		Provider ->
@@ -125,8 +129,10 @@ init_driver(Config, Provider) ->
 	% load driver
 	BaseDir = filename:rootname(filename:dirname(filename:absname(code:which(erlxsl_app))), "ebin"),
 	PrivDir = filename:join(BaseDir, "priv"),
-	BinPath = proplists:get_value(load_path, Config, PrivDir),
-	Driver = proplists:get_value(driver, Config, "erlxsl_drv"),
+	ct:pal("default load_path = ~p~n", [PrivDir]),
+	Options = proplists:get_value(driver_options, Config, []),
+	BinPath = proplists:get_value(load_path, Options, PrivDir),
+	Driver = "erlxsl_drv",
 	init_lib({erl_ddll:load_driver(BinPath, Driver), Driver}, Config, Provider).
 
 init_lib({{error, Error}, _}, _, _) ->
