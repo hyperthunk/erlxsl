@@ -45,28 +45,27 @@
 
 %% automatically registers all exported functions as test cases
 all() ->
-    ?EXPORT_TESTS(?MODULE).
+  ?EXPORT_TESTS(?MODULE).
 
 standard_request_creates_nested_iolist(_) ->
 	Xml = <<"<fragment><empty /></fragment>">>,
 	Xsl = <<"<?xml version='1.0'?>">>,
-	?_assertMatch(
+	?assertMatch(
 		[
 			[_XmlTypeHdr, _XslTypeHdr, _ParamSizeHdr],
 			[_XmlSizeHdr, _XslSizeHdr],
 			[_XmlDataBinary, _XslDataBinary]
 		],
-		erlxsl_marshal:pack(?FILE_INPUT, ?FILE_INPUT, Xml, Xsl)
+		erlxsl_marshall:pack(?FILE_INPUT, ?FILE_INPUT, Xml, Xsl)
 	).
 
 parameterised_request_becomes_nested_iolist(_) ->
 	Xml = <<"<fragment><empty /></fragment>">>,
 	Xsl = <<"<?xml version='1.0'?>">>,
 	Parameters = [ {"p1", "value1"}, {"p2", "value2"} ],
-	?_assertMatch(
+	?assertMatch(
 		[
 			[_, _, <<2:16/native-integer>>],
-			[_XmlSizeHdr, _XslSizeHdr],
 			[
 				[
 					_P1NameSizeHdr,
@@ -81,7 +80,8 @@ parameterised_request_becomes_nested_iolist(_) ->
 					<<"value2">>
 				]
 			],
+			[_XmlSizeHdr, _XslSizeHdr],
 			[Xml, Xsl]
 		],
-		erlxsl_marshal:pack(?FILE_INPUT, ?FILE_INPUT, Xml, Xsl, Parameters)),
+		erlxsl_marshall:pack(?FILE_INPUT, ?FILE_INPUT, Xml, Xsl, Parameters)),
 	ok.

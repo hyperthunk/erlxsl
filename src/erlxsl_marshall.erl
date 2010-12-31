@@ -34,12 +34,10 @@
 %% Public API Exports
 -export([pack/4, pack/5]).
 
-%% @private
 pack(InputType, XslType, Input, Xsl) 
 when is_binary(Input) andalso is_binary(Xsl) ->
 	pack(InputType, XslType, Input, Xsl, []).
 
-%% @private
 pack(InputType, XslType, Input, Xsl, []) 
 when is_binary(InputType) andalso is_binary(XslType) ->
 	DataSizeMarkers = [ size(Input), size(Xsl) ],
