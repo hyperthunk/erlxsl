@@ -31,10 +31,35 @@
 
 /* INTERNAL DATA & DATA STRUCTURES */
 
+typedef enum {
+  InitOk,
+  LibraryNotFound,
+  EntryPointNotFound,
+  InitFailed,
+  OutOfMemory
+} DriverInit;
+
+// typedef void InitEngineFunc(xsl_engine* engine);
+typedef void (*init_func)(xsl_engine*);
+
+typedef struct {
+  char* name;
+  char* error_message;
+  void* library;
+  init_func init_f;
+} loader_spec;
+
 typedef struct {
   void*  port;
-	xsl_engine* provider;
-} driver_spec;
+	xsl_engine* engine;
+  loader_spec* loader;
+} driver_data;
+
+typedef struct {
+  EngineState state;
+  driver_data* driver;
+  transform_result* result; 
+} async_data;
 
 /*
  * Stores three headers used to identify the kind of input uris 
@@ -42,15 +67,15 @@ typedef struct {
  * supplied (arity).
  */
 typedef struct {
-    /* The position in which we're expecting the input kind value. */
-    Int8 input_kind;
-    /* The position in which we're expecting the xsl input kind value. */
-    Int8 xsl_kind;
-    /*
-     * The position in which we're expecting a value
-     * denoting the number of parameters being supplied.
-     */
-    Int16 param_grp_arity;
+  /* The position in which we're expecting the input kind value. */
+  Int8 input_kind;
+  /* The position in which we're expecting the xsl input kind value. */
+  Int8 xsl_kind;
+  /*
+   * The position in which we're expecting a value
+   * denoting the number of parameters being supplied.
+   */
+  Int16 param_grp_arity;
 } input_spec_hdr;
 
 /*
@@ -58,10 +83,10 @@ typedef struct {
  * of the input and stylesheet buffers).
  */
 typedef struct  {
-    /* The position in which we're expecting the input size marker value */
-    Int32 input_size;
-    /* The position in which we're expecting the xsl size marker value */
-    Int32 xsl_size;
+  /* The position in which we're expecting the input size marker value */
+  Int32 input_size;
+  /* The position in which we're expecting the xsl size marker value */
+  Int32 xsl_size;
 } payload_size_hdr;
 
 /*
@@ -69,23 +94,23 @@ typedef struct  {
  * request buffer, specifying the size of the argument name and value buffers.
  */
 typedef struct request_buffer_argument_outline {
-    /* size of the argument name string in the buffer. */
-    Int16  name_size;
-    /* size of the argument value string in the buffer. */
-    Int16  value_size;
+  /* size of the argument name string in the buffer. */
+  Int16  name_size;
+  /* size of the argument value string in the buffer. */
+  Int16  value_size;
 } arg_spec_hdr;
 
 static ErlDrvTermData atom_result; 
 static ErlDrvTermData atom_error;
+static const char *init_entry_point = "init_engine";
+static const char *init_error_message = "Unable to find entry point 'init_engine' in shared library ~s"; 
+static const char *heap_space_exhausted = "Out of Memory!";
 
 /* FORWARD DEFS */
 
-static void init_provider(driver_spec*, char *);
-static DriverState default_initialize(void*);
-static void default_handleTransform(void*);
-static DriverState default_postHandle(void*);
-static void default_shutdown(void*);
+static DriverInit init_provider(driver_data*, char*);
 static void cleanup_task(void*);
+static void apply_transform(void*);
 static ErlDrvData start_driver(ErlDrvPort, char*);
 static void stop_driver(ErlDrvData);
 static int call(ErlDrvData, unsigned int, char*, int, char**, int, unsigned int*);
@@ -97,17 +122,3 @@ static ErlDrvTermData* make_driver_term_bin(ErlDrvPort*, ErlDrvBinary*, ErlDrvTe
 #define INIT_COMMAND_MAGIC 9
 
 #define DRV_FREE(x) if (NULL != x) driver_free(x)
-
-#define READ_Int32(s)  ((((int)(((unsigned char*) (s))[0]))  << 24) | \
-                        (((int)(((unsigned char*) (s))[1]))  << 16) | \
-                        (((int)(((unsigned char*) (s))[2]))  << 8)  | \
-                        (((int)(((unsigned char*) (s))[3]))))
-
-#define ERROR(str, ...)  \
-    LOG(stderr, str, ##__VA_ARGS__);
-
-#define INFO(str, ...)  \
-    LOG(stdout, str, ##__VA_ARGS__);
-
-#define LOG(stream, str, ...)  \
-    fprintf(stream, str, ##__VA_ARGS__);

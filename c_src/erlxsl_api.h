@@ -48,6 +48,15 @@ extern "C" {
 #define DebugOut(message, args...) /* DEBUG OUTPUT DISABLED */
 #endif
 
+#define ERROR(str, ...)  \
+    LOG(stderr, str, ##__VA_ARGS__);
+
+#define INFO(str, ...)  \
+    LOG(stdout, str, ##__VA_ARGS__);
+
+#define LOG(stream, str, ...)  \
+    fprintf(stream, str, ##__VA_ARGS__);
+
 	// TODO: investigate using the Apache Portable Runtime
 	
   /* Data Types & Aliasing */
@@ -68,11 +77,11 @@ extern "C" {
 	  /*
 	   * The name of the parameter (as passed to xslt).
 	   */
-	  char * key;
+	  char* key;
 	  /*
 	   * The value assigned to the parameter (as passed to xslt).
 	   */
-	  char * value;
+	  char* value;
 	  /*
 	   * Stores a pointer to the next parameter, or NULL if this
 	   * element is the tail.
@@ -80,38 +89,13 @@ extern "C" {
 	  void* next;
   } param_info;
   
-  //TODO: supply explicit values here and (perhaps) use a bitmask to allow
-  //      setting values such as ProviderError | FatalError
-  //      [or perhaps have a separate ErrorState enum!?]
   typedef enum {
-     /* Set when everything *looks* fine - this is no guarantee of
-     * consistent data however!
-     */
     Ok,
-    /*
-     * Set when the input headers (a prelude containing parameter size
-     * and input type flags, set by the caller) is in an inconsistent format
-     * and/or contains inconsistent data (e.g. negative flags/size).
-     */
-    InconsistentInputHeaders,
-    /*
-     * Set when the expected buffer outline size exceeds the supplied
-     * buffer length. NB: Not sure if this will ever happen!
-     */
-    BufferSizeMismatch,
-    /*
-     * Set by providers, to let the driver know they've run into a problem.
-     */
-    ProviderError,
-    /*
-     * Set generally whenever a fatal runtime error occurs. 
-     */
-    FatalError,
-		/*
-		 * Set when the driver has exhausted available heap space.
-		 */
-		OutOfMemory
-  } DriverState;
+    Error,
+    XmlParseError,
+    XslTransformError,
+    OutOfMemoryError
+  } EngineState;
 
 	typedef enum input_type {
 		File = 1,
@@ -136,9 +120,9 @@ extern "C" {
     // A pointer to the head element in a linked list of param_info structures.
     param_info* parameters;
     // A pointer to the input data.
-    char * input;
+    char* input;
     // A pointer to the stylesheet data.
-    char * stylesheet;
+    char* stylesheet;
   } transform_job;
   
   /* comms related data structures (e.g. for interacting with the emulator) */    
@@ -165,11 +149,6 @@ extern "C" {
     /* Stores the current request context. */
     request_context* context;
     /*
-     * Holds the status of the current request. This is also a hint as
-     * to whether or not there is any useful information 
-   	 * in the errorMessage field. */
-    DriverState status;
-    /*
      * If anything went wrong with request processing, this field will
      * (hopefully) contain a helpful error message.
      */
@@ -193,15 +172,6 @@ extern "C" {
   } transform_result;
 
 /************************  THE EXTERNAL API ***********************************/
-    
-  /*
-   * Gives the implementation provider a chance to initialize.
-   * Returns a value from the 'DriverState' enumeration to indicate
-   * current system state. A return value of DriverState::ProviderError
-   * will cause the driver to exit, which the erlang port handler will
-   * interpret as and error and unload the driver library.
-   */
-  typedef DriverState InitFunc(void* state);
 
   /*
    * This function is the request handler hook used by plugins (such as 
@@ -212,7 +182,7 @@ extern "C" {
    * get data sent back to erlang.
    *
    */
-  typedef void TransformFunc(void* result); 
+  typedef EngineState TransformFunc(transform_result* result); 
   
   /*
    * This function gives the implementing plugin a chance to cleanup 
@@ -223,7 +193,7 @@ extern "C" {
    * will cause the driver to exit, which the erlang port handler will
    * interpret as and error and unload the driver library.
    */
-  typedef DriverState PostTransformFunc(void* result);
+  typedef EngineState PostTransformFunc(transform_result* result);
     
   /*
    * Gives the implementation provider a change to cleanup. Because this function
@@ -240,10 +210,9 @@ extern "C" {
 	typedef struct {
 		/* The following function pointers will need 
 		   be set by the provider on startup */
-		InitFunc 						*initialize;
-		TransformFunc 			*transform;
-		PostTransformFunc		*after_transform;
-		ShutdownFunc				*shutdown;
+		TransformFunc*      transform;
+		PostTransformFunc*  after_transform;
+		ShutdownFunc*       shutdown;
 		/* Generic storage location, so providers can stash whatever they need. */
     void* 							providerData;
 	} xsl_engine;
