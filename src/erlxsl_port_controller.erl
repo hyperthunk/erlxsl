@@ -28,7 +28,7 @@
 %% -----------------------------------------------------------------------------
 
 %% module annotations
--module(erlxsl_port_server).
+-module(erlxsl_port_controller).
 -author('Tim Watson <watson.timothy@gmail.com>').
 
 -behaviour(gen_server).

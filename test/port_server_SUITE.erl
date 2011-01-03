@@ -70,7 +70,7 @@ end_per_suite(_) ->
 	erlxsl_app:stop().
 
 driver_startup(_) ->
-	X = erlxsl_port_server:transform(<<"<input />">>, <<"<output />">>),
+	X = erlxsl_port_controller:transform(<<"<input />">>, <<"<output />">>),
 	?assertMatch(<<"<input /><output />">>, X),
 	ok.
 	
