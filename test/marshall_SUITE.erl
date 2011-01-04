@@ -9,10 +9,10 @@
 %%       this list of conditions and the following disclaimer.
 %%
 %%     * Redistributions in binary form must reproduce the above copyright notice, this list of conditions
-%% 	     and the following disclaimer in the documentation and/or other materials provided with the distribution.
+%%        and the following disclaimer in the documentation and/or other materials provided with the distribution.
 %%
 %%     * Neither the name of the author nor the names of any contributors may be used to endorse or
-%% 	     promote products derived from this software without specific prior written permission.
+%%        promote products derived from this software without specific prior written permission.
 %%
 %% THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY
 %% EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
@@ -48,40 +48,40 @@ all() ->
   ?EXPORT_TESTS(?MODULE).
 
 standard_request_creates_nested_iolist(_) ->
-	Xml = <<"<fragment><empty /></fragment>">>,
-	Xsl = <<"<?xml version='1.0'?>">>,
-	?assertMatch(
-		[
-			[_XmlTypeHdr, _XslTypeHdr, _ParamSizeHdr],
-			[_XmlSizeHdr, _XslSizeHdr],
-			[_XmlDataBinary, _XslDataBinary]
-		],
-		erlxsl_marshall:pack(?FILE_INPUT, ?FILE_INPUT, Xml, Xsl)
-	).
+  Xml = <<"<fragment><empty /></fragment>">>,
+  Xsl = <<"<?xml version='1.0'?>">>,
+  ?assertMatch(
+    [
+      [_XmlTypeHdr, _XslTypeHdr, _ParamSizeHdr],
+      [_XmlSizeHdr, _XslSizeHdr],
+      [_XmlDataBinary, _XslDataBinary]
+    ],
+    erlxsl_marshall:pack(?FILE_INPUT, ?FILE_INPUT, Xml, Xsl)
+  ).
 
 parameterised_request_becomes_nested_iolist(_) ->
-	Xml = <<"<fragment><empty /></fragment>">>,
-	Xsl = <<"<?xml version='1.0'?>">>,
-	Parameters = [ {"p1", "value1"}, {"p2", "value2"} ],
-	?assertMatch(
-		[
-			[_, _, <<2:16/native-integer>>],
-			[
-				[
-					_P1NameSizeHdr,
-					_P1ValueSizeHdr,
-					_P2NameSizeHdr,
-					_P2ValueSizeHdr
-				],
-				[
-					<<"p1">>,
-					<<"value1">>,
-					<<"p2">>,
-					<<"value2">>
-				]
-			],
-			[_XmlSizeHdr, _XslSizeHdr],
-			[Xml, Xsl]
-		],
-		erlxsl_marshall:pack(?FILE_INPUT, ?FILE_INPUT, Xml, Xsl, Parameters)),
-	ok.
+  Xml = <<"<fragment><empty /></fragment>">>,
+  Xsl = <<"<?xml version='1.0'?>">>,
+  Parameters = [ {"p1", "value1"}, {"p2", "value2"} ],
+  ?assertMatch(
+    [
+      [_, _, <<2:16/native-integer>>],
+      [
+        [
+          _P1NameSizeHdr,
+          _P1ValueSizeHdr,
+          _P2NameSizeHdr,
+          _P2ValueSizeHdr
+        ],
+        [
+          <<"p1">>,
+          <<"value1">>,
+          <<"p2">>,
+          <<"value2">>
+        ]
+      ],
+      [_XmlSizeHdr, _XslSizeHdr],
+      [Xml, Xsl]
+    ],
+    erlxsl_marshall:pack(?FILE_INPUT, ?FILE_INPUT, Xml, Xsl, Parameters)),
+  ok.

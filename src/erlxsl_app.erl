@@ -35,12 +35,12 @@
 %%% Application API
 %%%
 start() ->
-	%% ct:pal("requesting app startup", []),
+  %% ct:pal("requesting app startup", []),
   application:start(sasl),
-	application:start(erlxsl).
+  application:start(erlxsl).
 
 stop() ->
-	application:stop(erlxsl).
+  application:stop(erlxsl).
 
 %% ===================================================================
 %% Application callbacks
@@ -48,9 +48,9 @@ stop() ->
 
 start(_StartType, _StartArgs) ->
   {ok, Pid} = erlxsl_sup:start_link(),
-	erlxsl_fast_log:info("erlxsl supervisor is up..."),
-	{ok, Pid}.
+  erlxsl_fast_log:info("erlxsl supervisor is up..."),
+  {ok, Pid}.
 
 stop(_State) ->
-	ok.
+  ok.
 

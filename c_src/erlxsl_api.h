@@ -34,9 +34,9 @@
 #include <stdbool.h>
 
 #ifndef _ERLXSL_H
-#define	_ERLXSL_H
+#define  _ERLXSL_H
 
-#ifdef	__cplusplus
+#ifdef  __cplusplus
 extern "C" {
 #endif
 
@@ -57,36 +57,36 @@ extern "C" {
 #define LOG(stream, str, ...)  \
     fprintf(stream, str, ##__VA_ARGS__);
 
-	// TODO: investigate using the Apache Portable Runtime
-	
+  // TODO: investigate using the Apache Portable Runtime
+  
   /* Data Types & Aliasing */
   
-  typedef uint8_t      	UInt8;
-  typedef uint16_t     	UInt16;
-  typedef uint32_t     	UInt32;
-  typedef int8_t       	Int8;
-  typedef int16_t     	Int16;
-  typedef int32_t     	Int32;
-  typedef int64_t    		Int64;
+  typedef uint8_t        UInt8;
+  typedef uint16_t       UInt16;
+  typedef uint32_t       UInt32;
+  typedef int8_t         Int8;
+  typedef int16_t       Int16;
+  typedef int32_t       Int32;
+  typedef int64_t        Int64;
   
   /*
    * Packages information about a parameter (its name and value)
    * and the next parameter in line - i.e. this is a linked list.
    */
   typedef struct {
-	  /*
-	   * The name of the parameter (as passed to xslt).
-	   */
-	  char* key;
-	  /*
-	   * The value assigned to the parameter (as passed to xslt).
-	   */
-	  char* value;
-	  /*
-	   * Stores a pointer to the next parameter, or NULL if this
-	   * element is the tail.
-	   */
-	  void* next;
+    /*
+     * The name of the parameter (as passed to xslt).
+     */
+    char* key;
+    /*
+     * The value assigned to the parameter (as passed to xslt).
+     */
+    char* value;
+    /*
+     * Stores a pointer to the next parameter, or NULL if this
+     * element is the tail.
+     */
+    void* next;
   } param_info;
   
   typedef enum {
@@ -97,13 +97,13 @@ extern "C" {
     OutOfMemoryError
   } EngineState;
 
-	typedef enum input_type {
-		File = 1,
-		Buffer = 2,
-		Stream = 3
-	} InputType;
-	
-	typedef enum { Binary, Text } ResultFormat;
+  typedef enum input_type {
+    File = 1,
+    Buffer = 2,
+    Stream = 3
+  } InputType;
+  
+  typedef enum { Binary, Text } ResultFormat;
     
   /*
    * transform_request packages the data used during
@@ -159,15 +159,15 @@ extern "C" {
      * the same bounds checking regardless.
      */
     int size;
-		/* The format in which the resulting data is stored */
-		ResultFormat format;
+    /* The format in which the resulting data is stored */
+    ResultFormat format;
     /* Stores the response data itself. */
     union { 
-	    /* Maintaining our response data in a buffer. */
-	    char* buffer;
-	    /* Maintaining our response data in the *driver term format*; this
-	     is a pointer to the start of an array in the appropriate format.*/
-	    void* data;
+      /* Maintaining our response data in a buffer. */
+      char* buffer;
+      /* Maintaining our response data in the *driver term format*; this
+       is a pointer to the start of an array in the appropriate format.*/
+      void* data;
     } payload;
   } transform_result;
 
@@ -199,29 +199,29 @@ extern "C" {
    * Gives the implementation provider a change to cleanup. Because this function
    * is only called when the driver is being stopped, the provider cannot supply
    * a meaningful return value, therefore the function returns void.
-	 *
-	 * After this function returns, the memory allocated for the xsl_engine will be
-	 * freed, which means that the engine must fully release all references/pointers 
-	 * held before returning.
+   *
+   * After this function returns, the memory allocated for the xsl_engine will be
+   * freed, which means that the engine must fully release all references/pointers 
+   * held before returning.
    */
    typedef void ShutdownFunc(void* state);
    
-	/* Represents an XSLT engine. */
-	typedef struct {
-		/* The following function pointers will need 
-		   be set by the provider on startup */
-		TransformFunc*      transform;
-		PostTransformFunc*  after_transform;
-		ShutdownFunc*       shutdown;
-		/* Generic storage location, so providers can stash whatever they need. */
-    void* 							providerData;
-	} xsl_engine;
+  /* Represents an XSLT engine. */
+  typedef struct {
+    /* The following function pointers will need 
+       be set by the provider on startup */
+    TransformFunc*      transform;
+    PostTransformFunc*  after_transform;
+    ShutdownFunc*       shutdown;
+    /* Generic storage location, so providers can stash whatever they need. */
+    void*               providerData;
+  } xsl_engine;
 
 /******************************************************************************/    
     
 
-#ifdef	__cplusplus
+#ifdef  __cplusplus
 }
 #endif
 
-#endif	/* _ERLXSL_H */
+#endif  /* _ERLXSL_H */

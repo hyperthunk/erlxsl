@@ -43,7 +43,7 @@
 -export([start/0, start_link/0, start/1, start_link/1, stop/0, transform/2]).
 
 -define(SERVER, ?MODULE).
--define(PORT_INIT, 9).		%% magic number indicating that the port should initialize itself 
+-define(PORT_INIT, 9).    %% magic number indicating that the port should initialize itself 
 -record(state, {
   port          :: port(),
   logger        :: module(),  
@@ -60,7 +60,7 @@ start() ->
 %% @doc starts erlxsl_port_server with default options. 
 %% NB: this means that the XSLT provider will be a test stub!
 start(Config) ->
-	gen_server:start({local,?SERVER}, ?SERVER, Config, []).
+  gen_server:start({local,?SERVER}, ?SERVER, Config, []).
 
 start_link() ->
   start_link(application:get_all_env(erlxsl)).
@@ -68,68 +68,68 @@ start_link() ->
 %% @doc starts erlxsl_port_server with default options. 
 %% NB: this means that the XSLT provider will be a test stub!
 start_link(Config) ->
-	gen_server:start_link({local,?SERVER}, ?SERVER, Config, []).
+  gen_server:start_link({local,?SERVER}, ?SERVER, Config, []).
 
 stop() ->
-	gen_server:cast(?SERVER, stop).
+  gen_server:cast(?SERVER, stop).
 
 transform(Input, Xsl) ->
-	gen_server:cast(?SERVER, {transform, Input, Xsl, self()}),
-	receive 
-		{result,_,Result} ->
-			Result;
-		{data, Data} ->
-			{error, Data};
-		Other -> Other
-	end.
+  gen_server:cast(?SERVER, {transform, Input, Xsl, self()}),
+  receive 
+    {result,_,Result} ->
+      Result;
+    {data, Data} ->
+      {error, Data};
+    Other -> Other
+  end.
 
 %% gen_server api
 init(Config) ->
-	erlxsl_fast_log:info("initializing port_server with config [~p]~n", [Config]),
-	Options = proplists:get_value(driver_options, Config, [{engine, "default_provider"}]),
-	State = init_config([proplists:get_value(logger, Config)|Options]),
-	case State#state.engine of 
-		undefined -> {stop, {config_error, "No XSLT Engine Specified."}};
-		_ ->
-			process_flag(trap_exit, true),
-			init_driver(State)
-	end.
+  erlxsl_fast_log:info("initializing port_server with config [~p]~n", [Config]),
+  Options = proplists:get_value(driver_options, Config, [{engine, "default_provider"}]),
+  State = init_config([proplists:get_value(logger, Config)|Options]),
+  case State#state.engine of 
+    undefined -> {stop, {config_error, "No XSLT Engine Specified."}};
+    _ ->
+      process_flag(trap_exit, true),
+      init_driver(State)
+  end.
 
 handle_call(_Msg, _From, State) ->
-	{noreply, State}.
+  {noreply, State}.
 
 handle_cast({transform, Input, Stylesheet, Sender}, #state{logger=Log}=State) ->
-	Log:info("handle_cast sender = ~p~n", [Sender]),
-	handle_transform(?BUFFER_INPUT, ?BUFFER_INPUT, 
-		Input, Stylesheet, State, Sender),
-	{noreply, State};
+  Log:info("handle_cast sender = ~p~n", [Sender]),
+  handle_transform(?BUFFER_INPUT, ?BUFFER_INPUT, 
+    Input, Stylesheet, State, Sender),
+  {noreply, State};
 handle_cast(stop, State) ->
-	{stop, shutdown, State};
+  {stop, shutdown, State};
 handle_cast(_, State) ->
-	{noreply, State}.
+  {noreply, State}.
 
 handle_info(Unknown, #state{logger=Log}=State) ->
-	Log:warn("Port server received unknown message ~p~n", [Unknown]),
-	{noreply, State}.
+  Log:warn("Port server received unknown message ~p~n", [Unknown]),
+  {noreply, State}.
 
 terminate(Reason, #state{ logger=Log, driver=Driver }) ->
-	Unload = erl_ddll:unload_driver(Driver),
-	Log:info("Terminating [~p] - driver unload [~p]~n", [Reason, Unload]).
+  Unload = erl_ddll:unload_driver(Driver),
+  Log:info("Terminating [~p] - driver unload [~p]~n", [Reason, Unload]).
 
 code_change(_OldVsn, State, _Extra) ->
-	{ok, State}.
+  {ok, State}.
 
 %% private api
     
 handle_transform(InType, XslType, Input, Stylesheet, #state{ port=Port }, Sender) ->
-	spawn(
-		fun() -> 
-			port_command(Port, erlxsl_marshall:pack(InType, XslType, Input, Stylesheet)),
-			receive 
-				Data -> Sender ! Data
-			end
-		end
-	).
+  spawn(
+    fun() -> 
+      port_command(Port, erlxsl_marshall:pack(InType, XslType, Input, Stylesheet)),
+      receive 
+        Data -> Sender ! Data
+      end
+    end
+  ).
 
 init_config(Config) ->
   #state{
@@ -141,25 +141,25 @@ init_config(Config) ->
 
 init_path() ->
   BaseDir = rootname(dirname(absname(code:which(erlxsl_app))), "ebin"),
-	join(BaseDir, "priv").
+  join(BaseDir, "priv").
 
 init_driver(#state{driver=Driver, load_path=BinPath}=State) ->
-	erl_ddll:start(),
-	% load driver
-	init_lib(erl_ddll:load_driver(BinPath, Driver), State).
+  erl_ddll:start(),
+  % load driver
+  init_lib(erl_ddll:load_driver(BinPath, Driver), State).
 
 init_lib({error, Error}, _) ->
   {stop, {Error, erl_ddll:format_error(Error)}};
 init_lib(ok, #state{ driver=Driver }=State) ->
-	Port = open_port({spawn, Driver}, [binary]),
-	init_port(State#state{ port=Port }).
+  Port = open_port({spawn, Driver}, [binary]),
+  init_port(State#state{ port=Port }).
 
 init_port(#state{ port=Port, engine=Engine }=State) when is_list(Engine) ->
-	try (erlang:port_call(Port, 9, Engine)) of
-		configured -> {ok, State};
-		Other -> {stop, {unexpected_driver_state, Other}}
-	catch 
-		_:Badness -> 
-			terminate(Badness, State),
-			{stop, Badness}
-	end.
+  try (erlang:port_call(Port, 9, Engine)) of
+    configured -> {ok, State};
+    Other -> {stop, {unexpected_driver_state, Other}}
+  catch 
+    _:Badness -> 
+      terminate(Badness, State),
+      {stop, Badness}
+  end.

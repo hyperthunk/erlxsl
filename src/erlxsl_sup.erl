@@ -45,9 +45,13 @@ start_link() ->
 
 init([]) ->
     Children = [
-			{erlxsl_fast_log, {erlxsl_fast_log, start_link, []}, permanent, 5000, worker, [gen_server]},
-			{erlxsl_port_controller, {erlxsl_port_controller, start_link, []}, permanent, 5000, worker, [gen_server]}
-		],
+      {erlxsl_fast_log,
+        {erlxsl_fast_log, start_link, []},
+        permanent, 5000, worker, [gen_server]},
+      {erlxsl_port_controller,
+        {erlxsl_port_controller, start_link, []},
+        permanent, 5000, worker, [gen_server]}
+    ],
     {ok, {{one_for_one, 10, 10}, Children}}.
 
 

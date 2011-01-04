@@ -29,7 +29,7 @@
 
 #include "erlxsl_api.h"
 
-#ifdef	__cplusplus
+#ifdef  __cplusplus
 extern "C" {
 #endif
 
@@ -47,31 +47,31 @@ void init_engine(xsl_engine *spec) {
 
 static EngineState 
 default_handleTransform(transform_result *result) {
-	INFO("default_handleTransform\n");	
+  INFO("default_handleTransform\n");  
   transform_result *res = (transform_result*)result;
-	transform_job *job = (res->context)->job;
-	char *output = malloc(sizeof(char) * ((strlen(job->input) + strlen(job->stylesheet)) + 1)); 
-	if (output == NULL) {
+  transform_job *job = (res->context)->job;
+  char *output = malloc(sizeof(char) * ((strlen(job->input) + strlen(job->stylesheet)) + 1)); 
+  if (output == NULL) {
     return OutOfMemoryError;
-	}
-	strcpy(output, job->input);
-	strcat(output, job->stylesheet);
-	res->format = Text;
+  }
+  strcpy(output, job->input);
+  strcat(output, job->stylesheet);
+  res->format = Text;
   res->payload.buffer = output;
   return Ok;
 };
 
 static EngineState 
 default_postHandle(transform_result *result) {
-	INFO("default_postHandle\n");
+  INFO("default_postHandle\n");
   return Ok;
 };
 
 static void 
 default_shutdown(void *state) {
-	INFO("default_shutdown\n");
+  INFO("default_shutdown\n");
 };
 
-#ifdef	__cplusplus
+#ifdef  __cplusplus
 }
 #endif

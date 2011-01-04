@@ -5,7 +5,7 @@
 -define(TESTDOC(Doc), [{userdata,[{doc,Doc}]}]).
 -define(NOT_IMPLEMENTED, {skip,"Not implemented."}).
 -define(EXPORT_TESTS(Mod),
-	[ {exports, Functions} | _ ] = Mod:module_info(),
+  [ {exports, Functions} | _ ] = Mod:module_info(),
     [ FName || {FName, _} <- lists:filter(
             fun ({module_info,_}) -> false ;
                 ({all,_}) -> false ;
