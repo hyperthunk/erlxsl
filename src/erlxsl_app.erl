@@ -35,7 +35,6 @@
 %%% Application API
 %%%
 start() ->
-  %% ct:pal("requesting app startup", []),
   application:start(sasl),
   application:start(erlxsl).
 

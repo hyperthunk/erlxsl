@@ -38,11 +38,9 @@
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
--include("../include/test.hrl").
+-include_lib("hamcrest/include/hamcrest.hrl").
 -include("../include/erlxsl.hrl").
-
--define(SLAVE, esmt_test_slave).
--define(PORT_HINT, 10100).
+-include("../include/test.hrl").
 
 % public api exports
 
@@ -75,7 +73,5 @@ end_per_suite(_) ->
 
 driver_startup(_) ->
   X = erlxsl_port_controller:transform(<<"<input_data />">>, <<"<output />">>),
-  ct:pal("X = ~p~n", [X]),
-  %?assertMatch(<<"<input_data /><output />">>, X),
-  ok.
+  ?assertThat(X, equal_to(<<"<input_data /><output />">>)).
 
