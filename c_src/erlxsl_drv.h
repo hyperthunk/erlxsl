@@ -27,7 +27,7 @@
 #include <erl_driver.h>
 #include <ei.h>
 #include <stdarg.h>
-#include "erlxsl_api.h"
+#include "erlxsl.h"
 
 /* INTERNAL DATA & DATA STRUCTURES */
 

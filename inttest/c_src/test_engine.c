@@ -27,7 +27,7 @@
  *
  */
 
-#include "erlxsl_api.h"
+#include "erlxsl.h"
 
 #ifdef  __cplusplus
 extern "C" {
