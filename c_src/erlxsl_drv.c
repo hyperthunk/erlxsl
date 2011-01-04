@@ -40,6 +40,12 @@
   #include <dlfcn.h>
 #endif
 
+typedef struct {
+  EngineState state;
+  driver_data* driver;
+  transform_result* result; 
+} async_data;
+
 /* INTERNAL DRIVER FUNCTIONS */
 
 #ifdef WIN32

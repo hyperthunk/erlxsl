@@ -32,6 +32,7 @@
 /* INTERNAL DATA & DATA STRUCTURES */
 
 typedef enum {
+  Success,
   InitOk,
   LibraryNotFound,
   EntryPointNotFound,
@@ -57,10 +58,10 @@ typedef struct {
 } driver_data;
 
 typedef struct {
-  EngineState state;
-  driver_data* driver;
-  transform_result* result; 
-} async_data;
+  void* port;
+  XslEngine* engine;
+  loader_spec* loader;
+} DriverHandle;
 
 /*
  * Stores three headers used to identify the kind of input uris 
@@ -122,4 +123,4 @@ static ErlDrvTermData* make_driver_term_bin(ErlDrvPort*, ErlDrvBinary*, ErlDrvTe
 
 #define INIT_COMMAND (UInt32)9
 
-#define DRV_FREE(x) if (NULL != x) driver_free(x)
+#define DRV_FREE(x) if (x != NULL) driver_free(x)

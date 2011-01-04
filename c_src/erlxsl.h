@@ -84,7 +84,7 @@ extern "C" {
 
   /* Indicator of the format for data stored in a DriverIOVec. */
   typedef enum { 
-    /* Binary data encoded in the External Term Format using EI. */
+    /* Binary data (i.e., ErlDrvBinary). */
     Binary, 
     /* An ErlXSL API Object. */
     Object, 
@@ -104,7 +104,7 @@ extern "C" {
     /* Indicates the type of data in the 'payload' field. */
     DataFormat type;
     /* Indicates the size of the buffer (or data) where this is necessary. */
-    UInt32 size; // FIXME: this is a big assumption about the MAX response size!
+    Int32 size; // FIXME: this is a big assumption about the MAX response size!
     union {
       /* Maintaining our response data in a buffer. */
       char* buffer;
@@ -159,7 +159,7 @@ extern "C" {
   
   /* A generic command. */
   typedef struct {
-    char* command_string;
+    const char *command_string;
     /* Stores either an IO vector containing the command data or an XslTask. 
        When command_string == "transform" then command_data contains the XslTask. */        
     union {
