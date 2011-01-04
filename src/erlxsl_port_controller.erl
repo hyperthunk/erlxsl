@@ -154,8 +154,8 @@ init_lib(ok, #state{ driver=Driver }=State) ->
 	Port = open_port({spawn, Driver}, [binary]),
 	init_port(State#state{ port=Port }).
 
-init_port(#state{ port=Port, engine=Engine }=State) ->
-	try (erlang:port_call(Port, 9, term_to_binary(Engine))) of
+init_port(#state{ port=Port, engine=Engine }=State) when is_list(Engine) ->
+	try (erlang:port_call(Port, 9, Engine)) of
 		configured -> {ok, State};
 		Other -> {stop, {unexpected_driver_state, Other}}
 	catch 

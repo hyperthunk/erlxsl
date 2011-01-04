@@ -42,56 +42,62 @@
 
 /* INTERNAL DRIVER FUNCTIONS */
 
-/*
-static void* try_driver_alloc(size_t size, void* pfree, ...) {
-	void* val = driver_alloc(size);
-	if (val == NULL) {
-		va_list ap;
-		void* p;
-		
-		va_start(ap, pfree); 
-		while ((p = va_arg(ap, void*)) != NULL) {
-			DRV_FREE(p);
-		}
-		va_end(ap);
-	}
-	return val;
-}
-*/
-
 #ifdef WIN32
 static void* 
-dlsym(void* mod, const char *func) {
+dlsym(void *mod, const char *func) {
   HMODULE lib = (HMODULE)mod;
   void *funcp = (void*)GetProcAddress(lib, func);
   return funcp;
 };
 
 static int
-dlclose(void* handle) {
+dlclose(void *handle) {
   FreeLibrary((HMODULE)handle);
 };
 #endif
 
 static void
-load_library(loader_spec* dest) {
+set_dlerror(loader_spec *dest, char *message) {
 #ifdef WIN32
-  if ((dest->library = LoadLibrary((const char*)dest->name)) == NULL) {
-    DWORD error_code = GetLastError();
-    sprintf(dest->error_message, "Unable to load provider library. ErrorCode: ~i", (UInt32)error_code);
-  }
+  DWORD error_code = GetLastError();
+  strcat(message, " ErrorCode: ~i");
+  sprintf(dest->error_message, message, (UInt32)error_code);
 #else
-  if ((dest->library = dlopen(dest->name, /*RTLD_LAZY*/ RTLD_NOW)) == NULL) {
-    dest->error_message = dlerror();
-  }
+  dest->error_message = dlerror();
+  if (dest->error_message == NULL) {
+    sprintf(dest->error_message, message, dest->name);
+  } 
+#endif
+};
+
+#ifdef WIN32
+static void *_dlopen(const char *name) {
+  return LoadLibrary(name);
+};
+#else
+static void *_dlopen(const char *file) {
+  return dlopen(file, /*RTLD_LAZY*/ RTLD_NOW);
+};
 #endif
 
+static void
+load_library(loader_spec *dest) {
+  char *libload_failure = "Unable to load xslt provider library.";
+  char *entrypoint_failure = "Unable to locate entry point 'init_engine'.";
+  
+  if ((dest->library = _dlopen((const char*)dest->name)) == NULL) {
+    INFO("dlopen failed with %s'\n", dlerror());
+    set_dlerror(dest, libload_failure);
+  }
+  
+  printf("library %s = %p\n", dest->name, dest->library);
+
   if ((dest->init_f = dlsym(dest->library, init_entry_point)) == NULL) {
-    sprintf(dest->error_message, init_error_message, dest->name);
+    set_dlerror(dest, entrypoint_failure);
   }
 };
 
-static DriverInit 
+static DriverState 
 init_provider(driver_data *drv, char *buff) {
 	xsl_engine *engine = (xsl_engine*)driver_alloc(sizeof(xsl_engine));
 	loader_spec* lib = (loader_spec*)driver_alloc(sizeof(loader_spec));
@@ -151,16 +157,18 @@ cleanup_task(void *async_state) {
 		  current = job->parameters;
 			INFO("cleanup parameters\n");
 			while (current != NULL) {
-				INFO("current wasn't null!?\n");			
+				INFO("current wasn't null!? - %p\n", current);			
 			  next = (param_info*)current->next;
+				INFO("next - %p\n", next);
 			  DRV_FREE(current->key);
 			  DRV_FREE(current->value);
+        DRV_FREE(current);
 			  current = next;
 			}
 			INFO("cleanup job\n");
 			DRV_FREE(job);
 	  }
-		INFO("cleanup contet\n");
+		INFO("cleanup context\n");
 		DRV_FREE(ctx);
 	}
 	INFO("cleanup result!\n");		
@@ -271,27 +279,29 @@ call(ErlDrvData drv_data, unsigned int command, char *buf,
 	int len, char **rbuf, int rlen, unsigned int *flags) {
 	
 	int i;
+  int type;
 	int size;
   int index = 0;
 	int rindex = 0;
-	char *p;
-	DriverInit state;    
+  /*int arity;	
+  char cmd[MAXATOMLEN];*/
+  char *data;
+	DriverState state;    
   driver_data *d = (driver_data*)drv_data;
-		
-	/*if (command != INIT_COMMAND_MAGIC) {
-		fprintf(stdout, "Driver received improper command code %i\n", command);
-		return((int) ERL_DRV_ERROR_GENERAL);	// this will throw badarg in the emulator
-	}*/
 	
-	ei_decode_version(buf, &index, &i);
-	ei_get_type(buf, &index, &i, &size);
-  p = driver_alloc(size + 1); 
-  ei_decode_string(buf, &index, p);
+	ei_decode_version(buf, &index, &i);	
+	if (command == INIT_COMMAND) {
+	  ei_get_type(buf, &index, &type, &size);
+    INFO("ei_get_type %s of size = %i\n", ((char*)&type), size);
+    data = driver_alloc(size + 1); 
+    ei_decode_string(buf, &index, data);
+	  INFO("Driver received data %s\n", data);
+	  state = init_provider(d, data);
+	} else {
+    state = UnknownCommand;
+	}
 	
-	INFO("Driver received provider init command %s of %i\n", p, size);
-
-	ei_encode_version(*rbuf, &rindex);	
-	state = init_provider(d, p);
+	ei_encode_version(*rbuf, &rindex);
 	if (state == InitOk) {
 	  ei_encode_atom(*rbuf, &rindex, "configured");
 	} else {
@@ -299,12 +309,14 @@ call(ErlDrvData drv_data, unsigned int command, char *buf,
 		ei_encode_atom(*rbuf, &rindex, "error");
 		if (state == OutOfMemory) {
       ei_encode_string(*rbuf, &rindex, heap_space_exhausted);
+		} else if (state == UnknownCommand) {
+      ei_encode_string(*rbuf, &rindex, unknown_command);
 		} else {
       const char *err = (d->loader)->error_message;
       ei_encode_string_len(*rbuf, &rindex, err, strlen(err));
 		}
 	}	
-	DRV_FREE(p);
+	DRV_FREE(data);
 	return(rindex);
 };
 
@@ -364,10 +376,11 @@ outputv(ErlDrvData drv_data, ErlIOVec *ev) {
 	xml = driver_alloc((sizeof(char) * hsize.input_size) + 1);
 	xsl = driver_alloc((sizeof(char) * hsize.xsl_size) + 1);
 	job = (transform_job*)driver_alloc(sizeof(transform_job));
+  job->parameters = NULL;	
 	ctx = (request_context*)driver_alloc(sizeof(request_context));
 	result = (transform_result*)driver_alloc(sizeof(transform_result));
   asd = (async_data*)driver_alloc(sizeof(async_data)); 
-	
+  
 	if (xml == NULL || xsl == NULL || job == NULL || ctx == NULL || asd == NULL) { 
 		DRV_FREE(xml);
 		DRV_FREE(xsl);

@@ -36,8 +36,9 @@ typedef enum {
   LibraryNotFound,
   EntryPointNotFound,
   InitFailed,
-  OutOfMemory
-} DriverInit;
+  OutOfMemory,
+  UnknownCommand
+} DriverState;
 
 // typedef void InitEngineFunc(xsl_engine* engine);
 typedef void (*init_func)(xsl_engine*);
@@ -103,12 +104,12 @@ typedef struct request_buffer_argument_outline {
 static ErlDrvTermData atom_result; 
 static ErlDrvTermData atom_error;
 static const char *init_entry_point = "init_engine";
-static const char *init_error_message = "Unable to find entry point 'init_engine' in shared library ~s"; 
+static const char *unknown_command = "Unknown Command!";
 static const char *heap_space_exhausted = "Out of Memory!";
 
 /* FORWARD DEFS */
 
-static DriverInit init_provider(driver_data*, char*);
+static DriverState init_provider(driver_data*, char*);
 static void cleanup_task(void*);
 static void apply_transform(void*);
 static ErlDrvData start_driver(ErlDrvPort, char*);
@@ -119,6 +120,6 @@ static void ready_async(ErlDrvData, ErlDrvThreadData);
 static ErlDrvTermData* make_driver_term(ErlDrvPort*, char*, ErlDrvTermData*, long*);
 static ErlDrvTermData* make_driver_term_bin(ErlDrvPort*, ErlDrvBinary*, ErlDrvTermData*, long*);
 
-#define INIT_COMMAND_MAGIC 9
+#define INIT_COMMAND (UInt32)9
 
 #define DRV_FREE(x) if (NULL != x) driver_free(x)

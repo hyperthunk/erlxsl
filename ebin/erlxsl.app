@@ -12,4 +12,4 @@
   {registered,[erlxsl_port_controller,erlxsl_fast_logger]},
   {applications,[kernel,stdlib,sasl]},
   {env,
-   [{driver_options,[{engine,"default_provider"},{driver,"erlxsl_drv"}]}]}]}.
+   [{driver_options,[{engine,"default_provider"},{driver,"erlxsl_drv"}, {load_path, "priv/bin"}]}]}]}.

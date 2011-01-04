@@ -29,6 +29,10 @@
 
 #include "erlxsl_api.h"
 
+#ifdef	__cplusplus
+extern "C" {
+#endif
+
 /* INTERNAL DRIVER FUNCTIONS */
 void init_engine(xsl_engine*);
 static EngineState default_handleTransform(transform_result*);
@@ -67,3 +71,7 @@ static void
 default_shutdown(void *state) {
 	INFO("default_shutdown\n");
 };
+
+#ifdef	__cplusplus
+}
+#endif
