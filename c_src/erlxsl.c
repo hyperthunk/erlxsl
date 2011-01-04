@@ -312,17 +312,18 @@ static void apply_transform(void *asd) {
   XslEngine* engine = driver->engine;
   Command* command = data->command;
   data->state = engine->transform(command);
+  DBG("output buffer: %s\n", command->result->payload.buffer);
 };
 
 static void
 free_iov(DriverIOVec *iov) {
   if (iov != NULL) {
     if (iov->type == Text) {
-      char *buffer = iov->payload.buffer;
-      DRV_FREE(buffer);
+      DBG("Freeing iov buffer %s\n", iov->payload.buffer);
+      DRV_FREE(iov->payload.buffer);
     } else {
-      void *data = iov->payload.data;
-      DRV_FREE(data);
+      DBG("Freeing iov data %p\n", iov->payload.data);
+      DRV_FREE(iov->payload.data);
     }
     driver_free(iov);
   }
@@ -362,21 +363,23 @@ free_task(XslTask *task) {
 
 static void
 free_command(Command *cmd) {
+  ASSERT(cmd != NULL);
   if (cmd != NULL) {
-    if (strcmp("transform", cmd->command_string)) {
+    if (strcmp("transform", cmd->command_string) == 0) {
       free_task(cmd->command_data.xsl_task);
     } else {
       free_iov(cmd->command_data.iov);
+      DRV_FREE((char*)cmd->command_string);
     }
     DRV_FREE(cmd->context);
     free_iov(cmd->result);  
-    DRV_FREE((char*)cmd->command_string);
     driver_free(cmd);
   }
 };
 
 static void 
 free_async_state(AsyncState *state) {
+  ASSERT(state != NULL);
   if (state != NULL) {
     free_command(state->command);
     DRV_FREE(state);
@@ -391,6 +394,7 @@ init_iov(DataFormat type,
   DriverIOVec *iov = (DriverIOVec*)driver_alloc(sizeof(DriverIOVec));
   if (iov == NULL) return NULL;
   
+  iov->dirty = (payload == NULL) ? 0 : 1;
   iov->type = type;
   iov->size = size;
   if (type == Text) {
@@ -435,7 +439,7 @@ init_task(XslTask *task,
   }
       
   if ((xsldoc = init_doc((InputType)hspec->xsl_kind, 
-      hsize->xsl_size, xml)) == NULL) {  
+      hsize->xsl_size, xsl)) == NULL) {  
     free_document(xmldoc);
     DRV_FREE(xml);
     DRV_FREE(xsl);
@@ -452,6 +456,7 @@ static Command*
 init_command(const char *command, DriverContext *context, XslTask* xsl_task, DriverIOVec* iov) {
   Command *cmd; 
   if ((cmd = (Command*)driver_alloc(sizeof(Command))) == NULL) return NULL;
+  if ((cmd->result = try_driver_alloc(context->port, sizeof(DriverIOVec), cmd)) == NULL) return NULL;
   if (xsl_task != NULL) {
     cmd->command_data.xsl_task = xsl_task;
   } else {
@@ -459,6 +464,8 @@ init_command(const char *command, DriverContext *context, XslTask* xsl_task, Dri
   }
   cmd->command_string = command;
   cmd->context = context;
+  cmd->alloc = driver_alloc;
+  cmd->release = driver_free;
   return cmd;
 };
 
@@ -732,7 +739,7 @@ static ErlDrvEntry driver_entry = {
   NULL,                       /* output, called when port receives messages */
   NULL,                       /* ready_input, called when input descriptor ready to read*/
   NULL,                       /* ready_output, called when output descriptor ready to write */
-  "erlxsl_drv",               /* the name of the driver */
+  "erlxsl",                   /* the name of the driver */
   NULL,                       /* finish, called when unloaded */ //TODO: should we do resource disposal here!?
   NULL,                       /* handle,  */
   NULL,                       /* control */

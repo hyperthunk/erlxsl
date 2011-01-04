@@ -146,6 +146,7 @@ init_path() ->
 init_driver(#state{driver=Driver, load_path=BinPath}=State) ->
   erl_ddll:start(),
   % load driver
+  ct:pal("loading driver ~p~n", [Driver]),
   init_lib(erl_ddll:load_driver(BinPath, Driver), State).
 
 init_lib({error, Error}, _) ->

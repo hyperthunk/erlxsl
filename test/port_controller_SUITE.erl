@@ -59,6 +59,7 @@ init_per_suite(C) ->
   UpdatedOpts = lists:keyreplace(load_path, 1, Opts, {load_path, PrivDir}),
   % FIXME: this [UpdatedOpts2] is only needed on OS-X.  
   Lib = proplists:get_value(engine, UpdatedOpts),
+  ct:pal("startup with lib ~p~n", [Lib]),
   UpdatedOpts2 = lists:keyreplace(engine, 1, UpdatedOpts, 
     {engine, filename:join(filename:join(BaseDir, "priv/test/bin"), Lib)}),
   UpdatedEnv = lists:keyreplace(driver_options, 1, Env, {driver_options, UpdatedOpts2}),
@@ -73,5 +74,6 @@ end_per_suite(_) ->
 
 driver_startup(_) ->
   X = erlxsl_port_controller:transform(<<"<input_data />">>, <<"<output />">>),
+  ct:pal("X = ~p~n", [X]),
   ?assertThat(X, equal_to(<<"<input_data /><output />">>)).
 

@@ -33,6 +33,10 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#ifdef DEBUG
+#include <assert.h>
+#endif
+
 #ifndef _ERLXSL_H
 #define  _ERLXSL_H
 
@@ -40,12 +44,13 @@
 extern "C" {
 #endif
 
-    /* macro definitions and other hash-defines */
+/* macro definitions and other hash-defines */
 #ifdef DEBUG
-#define DebugOut(/* (char*) */message, args...)  \
-    fprintf (stderr, message , ## args);
+#define ASSERT(stmt) assert(stmt)
+#define DBG(str, ...) INFO(str, ##__VA_ARGS__);
 #else
-#define DebugOut(message, args...) /* DEBUG OUTPUT DISABLED */
+#define ASSERT(stmt)      /* disabled */
+#define DBG(str, ...)   /* disabled */
 #endif
 
 #define ERROR(str, ...)  \
@@ -56,6 +61,40 @@ extern "C" {
 
 #define LOG(stream, str, ...)  \
     fprintf(stream, str, ##__VA_ARGS__);
+
+#define get_task(cmd) \
+    ((cmd == NULL)                                        \
+      ? NULL                                              \
+      : (strcmp("transform", cmd->command_string) == 0)   \
+        ? cmd->command_data.xsl_task                      \
+        : NULL)
+
+#define get_doc_buffer(idoc)  \
+    ((idoc == NULL) ? NULL : get_buffer(idoc->iov))
+
+#define get_doc_size(idoc)    \
+    ((idoc == NULL) ? -1 : idoc->iov->size)
+
+#define get_buffer(iov)             \
+    ((iov == NULL)                  \
+      ? NULL                        \
+      : ((iov->type == Text)        \
+        ? iov->payload.buffer       \
+        : NULL))
+
+#define assign_result_buffer(buffersize, cmd)                                 \
+    ((cmd == NULL)                                                            \
+      ? NULL                                                                  \
+      : ((cmd->result)->type = Text,                                          \
+         (cmd->result)->size = buffersize,                                    \
+         (cmd->result->payload.buffer = cmd->alloc(sizeof(char) * buffersize))))
+
+#define write_result_buffer(buff, cmd)                                        \
+    ((cmd == NULL || cmd->result == NULL)                                     \
+      ? NULL                                                                  \
+      : (cmd->result->dirty != 0)                                             \
+        ? strcat(cmd->result->payload.buffer, buff)                           \
+        : (cmd->result->dirty = 1, strcpy(cmd->result->payload.buffer, buff)))
 
   /* Data Types & Aliasing */
   
@@ -101,6 +140,8 @@ extern "C" {
    * from the DataFormat enum to indicate which 'payload' member is in use. 
    */  
   typedef struct { 
+    /* FOR INTERNAL USE ONLY */
+    unsigned int dirty:1;
     /* Indicates the type of data in the 'payload' field. */
     DataFormat type;
     /* Indicates the size of the buffer (or data) where this is necessary. */
@@ -157,6 +198,9 @@ extern "C" {
     ParameterListNode* parameters;
   } XslTask;  
   
+  typedef void* alloc_f(size_t size);
+  typedef void release_f(void* p);
+  
   /* A generic command. */
   typedef struct {
     const char *command_string;
@@ -170,6 +214,10 @@ extern "C" {
     DriverIOVec* result;
     /* The internal (driver) call context (i.e., port and calling process id). */    
     DriverContext* context;
+    /* Custom allocator (wraps erl_driver's driver_alloc) */
+    alloc_f* alloc;
+    /* Custom 'free' (wraps erl_driver's driver_free) */
+    release_f* release;
   } Command;
 
   /*
