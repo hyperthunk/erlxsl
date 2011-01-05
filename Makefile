@@ -1,6 +1,4 @@
 
-.PHONY: deps test
-
 ERL ?= `which erl`
 VERBOSE ?= ""
 HERE := $(shell pwd)
@@ -11,16 +9,17 @@ info:
 	$(info erl program located at $(ERL))
 	$(info ERL_LIBS set to $(ERL_LIBS))
 
-precompile:
-	@(env ERL_LIBS=$$ERL_LIBS ./rebar $$VERBOSE check-deps skip_deps=true)
-
 compile: precompile
 	@(env ERL_LIBS=$$ERL_LIBS ERL_INCLUDES=c_src:$$ERL_INCLUDES ./rebar $$VERBOSE compile skip_deps=true)
 
+precompile:
+	@(env ERL_LIBS=$$ERL_LIBS ./rebar check-deps skip_deps=true)
+
 clean:
 	@(./rebar clean skip_deps=true)
+	make -C inttest clean
 
-distclean: clean 
+distclean: clean
 	./rebar delete-deps
 
 docs:
@@ -29,5 +28,11 @@ docs:
 dialyzer: compile
 	@(dialyzer -Wno_return -c apps/riak_core/ebin)
 
-test: compile
+test: compile pretest
 	@(env ERL_LIBS=$$ERL_LIBS LD_LIBRARY_PATH=./priv:./priv/test/bin:$$LD_LIBRARY_PATH rebar $$VERBOSE ct skip_deps=true)
+	make -C inttest test
+
+pretest:
+	cd inttest && make -f Makefile
+
+.PHONY: deps test
