@@ -34,10 +34,18 @@
 %% Public API Exports
 -export([pack/4, pack/5]).
 
+%% @doc Packs the input and xsl type metadata and instance 
+%% data into an iolist, for submission to a linked-in port driver. 
+-spec(pack(InputType::binary(), XslType::binary(), Input::binary(), Xsl::binary()) -> iolist()).
 pack(InputType, XslType, Input, Xsl) 
 when is_binary(Input) andalso is_binary(Xsl) ->
   pack(InputType, XslType, Input, Xsl, []).
 
+%% @doc Packs the input and xsl type metadata, instance data and the 
+%% supplied proplist of parameters into an iolist, for submission
+%% to a linked-in port driver. 
+-spec(pack(InputType::binary(), XslType::binary(), 
+           Input::binary(), Xsl::binary(), Parameters::proplist()) -> iolist()).
 pack(InputType, XslType, Input, Xsl, []) 
 when is_binary(InputType) andalso is_binary(XslType) ->
   DataSizeMarkers = [ size(Input), size(Xsl) ],
@@ -53,13 +61,14 @@ when is_binary(InputType) andalso is_binary(XslType) ->
     [ <<Marker:32/native-integer>> || Marker <- DataSizeMarkers ],
     [ Input, Xsl ]].
 
-%%
+%% @doc hidden
 %% Constructs a nested structure (list) of binaries,
 %% containing the appropriate offset markers (for parameter names
 %% and values) followed by the parameter data itself (names followed
 %% by values). This structure is added to the other arguments, to form
 %% a package [ HEADERS | ( [ ParamHeaders | ParamData ] ), Input, Xsl ]
 %%
+-spec(pack(ParameterList::proplist()) -> iolist()).
 pack([])
   -> [];
 pack(ParameterList) ->

@@ -33,9 +33,11 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#ifdef DEBUG
-#include <assert.h>
+#ifndef DEBUG
+#define NDEBUG    // prevent assert from happening!
 #endif
+
+#include <assert.h>
 
 #ifndef _ERLXSL_H
 #define  _ERLXSL_H
@@ -46,10 +48,8 @@ extern "C" {
 
 /* macro definitions and other hash-defines */
 #ifdef DEBUG
-#define ASSERT(stmt) assert(stmt)
 #define DBG(str, ...) INFO(str, ##__VA_ARGS__);
 #else
-#define ASSERT(stmt)      /* disabled */
 #define DBG(str, ...)   /* disabled */
 #endif
 
@@ -198,7 +198,10 @@ extern "C" {
     ParameterListNode* parameters;
   } XslTask;  
   
+  /* Allocation function type. */  
   typedef void* alloc_f(size_t size);
+  
+  /* Release/Free function type. */
   typedef void release_f(void* p);
   
   /* A generic command. */
@@ -207,7 +210,9 @@ extern "C" {
     /* Stores either an IO vector containing the command data or an XslTask. 
        When command_string == "transform" then command_data contains the XslTask. */        
     union {
+      // Data is held in a DriverIOVec
       DriverIOVec* iov;
+      // Data is held as an XslTask
       XslTask* xsl_task; 
     } command_data;
     /* An IO vector containing the results. */        
@@ -266,7 +271,7 @@ extern "C" {
     /* Generic storage location, so providers can stash whatever they need. */
     void*                     providerData;
   } XslEngine;
-
+  
   //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
   
   /*

@@ -49,14 +49,14 @@ static EngineState
 default_handleTransform(Command *command) {
   INFO("default_handleTransform\n");  
   
-  ASSERT(command != NULL);
-  ASSERT(command->result != NULL);
+  assert(command != NULL);
+  assert(command->result != NULL);
   
   XslTask* task = get_task(command);
 
-  ASSERT(task != NULL);
-  ASSERT(task->input_doc != NULL);  
-  ASSERT(task->xslt_doc != NULL);
+  assert(task != NULL);
+  assert(task->input_doc != NULL);  
+  assert(task->xslt_doc != NULL);
 
   DBG("Checking buffer size\n");  
   Int32 buffersize = (get_doc_size(task->input_doc) + get_doc_size(task->xslt_doc) + 1); 
@@ -68,10 +68,10 @@ default_handleTransform(Command *command) {
   DBG("concatenating documents\n");
   
   char *input = get_doc_buffer(task->input_doc);
-  ASSERT(input != NULL);
+  assert(input != NULL);
   
   char *stylesheet = get_doc_buffer(task->xslt_doc);
-  ASSERT(stylesheet != NULL);
+  assert(stylesheet != NULL);
   
   if (!write_result_buffer(input, command)) return OutOfMemoryError;
   if (!write_result_buffer(stylesheet, command)) return OutOfMemoryError;

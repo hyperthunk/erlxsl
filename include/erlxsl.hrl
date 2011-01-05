@@ -26,3 +26,5 @@
 -define(FILE_INPUT,   <<1:8/native-integer>>).
 -define(BUFFER_INPUT, <<2:8/native-integer>>).
 -define(STREAM_INPUT, <<3:8/native-integer>>).
+
+-type(proplist() :: [{atom(), term()}]).

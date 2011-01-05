@@ -33,441 +33,16 @@
  *
  */
 
-#ifdef WIN32
-  #include <Windows.h>
-#else
-  #include <dlfcn.h>
-#endif
-#include <erl_driver.h>
-#include <ei.h>
-#include <stdarg.h>
-#include "erlxsl.h"
+// The erlxsl_driver header brings in the main erlxsl header and major pervasive includes
+#include "erlxsl_driver.h"
 
 /* INTERNAL DATA & DATA STRUCTURES */
 
-typedef enum {
-  Success,
-  InitOk,
-  LibraryNotFound,
-  EntryPointNotFound,
-  InitFailed,
-  OutOfMemory,
-  UnknownCommand
-} DriverState;
-
-// typedef void InitEngineFunc(xsl_engine* engine);
-typedef void (*init_func)(XslEngine*);
-
-typedef struct {
-  char* name;
-  char* error_message;
-  void* library;
-  init_func init_f;
-} LoaderSpec;
-
-typedef struct {
-  void* port;
-  XslEngine* engine;
-  LoaderSpec* loader;
-} DriverHandle;
-
-/*
- * Stores three headers used to identify the kind of input uris 
- * (e.g. file or buffer/memory) and the number of parameters being
- * supplied (arity).
- */
-typedef struct {
-  /* The position in which we're expecting the input kind value. */
-  Int8 input_kind;
-  /* The position in which we're expecting the xsl input kind value. */
-  Int8 xsl_kind;
-  /*
-   * The position in which we're expecting a value
-   * denoting the number of parameters being supplied.
-   */
-  Int16 param_grp_arity;
-} InputSpecHeaders;
-
-/*
- * Headers that specify the data size for the payload (i.e. the size
- * of the input and stylesheet buffers).
- */
-typedef struct  {
-  /* The position in which we're expecting the input size marker value */
-  Int32 input_size;
-  /* The position in which we're expecting the xsl size marker value */
-  Int32 xsl_size;
-} PayloadSizeHeaders;
-
-/*
- * Contains a structural outline of a single argument within the 
- * request buffer, specifying the size of the argument name and value buffers.
- */
-typedef struct request_buffer_argument_outline {
-  /* size of the argument name string in the buffer. */
-  Int16  name_size;
-  /* size of the argument value string in the buffer. */
-  Int16  value_size;
-} arg_spec_hdr;
-
-/* Used as a handle during async processing */ 
-typedef struct {
-  /* Holds the state of the XslEngine post processing. */
-  EngineState state;
-  /* Holds the DriverHandle. */
-  DriverHandle* driver;
-  /* Holds the command being processed. */
-  Command* command; 
-} AsyncState;
-
-static ErlDrvTermData atom_result; 
-static ErlDrvTermData atom_error;
-static const char *init_entry_point = "init_engine";
-static const char *unknown_command = "Unknown Command!";
-static const char *heap_space_exhausted = "Out of Memory!";
-static const char *transform_command = "transform";
-static const char *unsupported_response_type = "Unsupported Response Type.";
-
-/* FORWARD DEFS */
-
-static DriverState init_provider(DriverHandle*, char*);
-static void apply_transform(void*);
-static ErlDrvData start_driver(ErlDrvPort, char*);
-static void stop_driver(ErlDrvData);
-static int call(ErlDrvData, unsigned int, char*, int, char**, int, unsigned int*);
-static void outputv(ErlDrvData, ErlIOVec*);
-static void ready_async(ErlDrvData, ErlDrvThreadData);
-static ErlDrvTermData* make_driver_term(ErlDrvPort*, char*, ErlDrvTermData*, long*);
-static ErlDrvTermData* make_driver_term_bin(ErlDrvPort*, ErlDrvBinary*, ErlDrvTermData*, long*);
-
-#define INIT_COMMAND (UInt32)9
-
-#define DRV_FREE(x) if (x != NULL) driver_free(x)
-
-/* INTERNAL DRIVER FUNCTIONS */
-
-static void* try_driver_alloc(ErlDrvPort port, size_t size, void* pfree, ...) {
-  void* val = driver_alloc(size);
-  if (val == NULL) {
-    va_list ap;
-    void* p;
-    
-    va_start(ap, pfree); 
-    while ((p = va_arg(ap, void*)) != NULL) {
-		  DRV_FREE(p);
-    }
-    va_end(ap);
-    
-    driver_failure_atom(port, "system_limit"); 
-  }
-  return val;
-}
-
-#ifdef WIN32
-static void* 
-dlsym(void *mod, const char *func) {
-  HMODULE lib = (HMODULE)mod;
-  void *funcp = (void*)GetProcAddress(lib, func);
-  return funcp;
-};
-
-static int
-dlclose(void *handle) {
-  FreeLibrary((HMODULE)handle);
-};
-#endif
-
-static void
-set_dlerror(LoaderSpec *dest, char *message) {
-#ifdef WIN32
-  DWORD error_code = GetLastError();
-  strcat(message, " ErrorCode: ~i");
-  sprintf(dest->error_message, message, (UInt32)error_code);
-#else
-  dest->error_message = dlerror();
-  if (dest->error_message == NULL) {
-    sprintf(dest->error_message, message, dest->name);
-  } 
-#endif
-};
-
-#ifdef WIN32
-static void *_dlopen(const char *name) {
-  return LoadLibrary(name);
-};
-#else
-static void *_dlopen(const char *file) {
-  return dlopen(file, /*RTLD_LAZY*/ RTLD_NOW);
-};
-#endif
-
-static void
-load_library(LoaderSpec *dest) {
-  char *libload_failure = "Unable to load xslt provider library.";
-  char *entrypoint_failure = "Unable to locate entry point 'init_engine'.";
-  
-  if ((dest->library = _dlopen((const char*)dest->name)) == NULL) {
-    INFO("dlopen failed with %s'\n", dlerror());
-    set_dlerror(dest, libload_failure);
-  }
-  
-  printf("library %s = %p\n", dest->name, dest->library);
-
-  if ((dest->init_f = dlsym(dest->library, init_entry_point)) == NULL) {
-    set_dlerror(dest, entrypoint_failure);
-  }
-};
-
-static DriverState 
-init_provider(DriverHandle *drv, char *buff) {
-  XslEngine *engine = (XslEngine*)driver_alloc(sizeof(XslEngine));
-  LoaderSpec* lib = (LoaderSpec*)driver_alloc(sizeof(LoaderSpec));
-    
-  if (engine == NULL || lib == NULL) {
-    DRV_FREE(engine);
-    DRV_FREE(lib);
-    return OutOfMemory;
-  }
-  
-  drv->loader = lib;
-  lib->name = buff;
-  load_library(lib);
-
-  if (lib->library == NULL) {
-    // TODO: better reporting back to the port controller!?
-    puts(lib->error_message);    
-    return LibraryNotFound;
-  }
-  if (lib->init_f == NULL) {
-    // TODO: better reporting back to the port controller!?
-    puts(lib->error_message);
-    return EntryPointNotFound; 
-  }
-    
-  (lib->init_f)(engine);
-  if (engine == NULL) {
-    return InitFailed;
-  }
-  
-  drv->engine = engine;
-  return InitOk;
-};
-
-/* makes a tagged tuple (using the driver term format) for the supplied binary payload. */
-static ErlDrvTermData* 
-make_driver_term_bin(ErlDrvPort *port, ErlDrvBinary *payload, ErlDrvTermData *tag, long *length) {
-  ErlDrvTermData *term;
-  ErlDrvTermData  spec[10];
-  term = driver_alloc(sizeof(spec));
-  if (term == NULL) return NULL;
-  
-  spec[0] = ERL_DRV_ATOM;
-  spec[1] = *tag;
-  spec[2] = ERL_DRV_PORT;
-  spec[3] = driver_mk_port(*port);
-  spec[4] = ERL_DRV_BINARY; 
-  spec[5] = (ErlDrvTermData)payload; 
-  spec[6] = ERL_DRV_UINT;
-  spec[7] = payload->orig_size;
-  spec[8] = ERL_DRV_TUPLE; 
-  spec[9] = 3;
-  
-  memcpy(term, &spec, sizeof(spec));
-  *length = sizeof(spec) / sizeof(spec[0]);
-  return term;  
-};
-
-static ErlDrvTermData* 
-make_driver_term(ErlDrvPort *port, char *payload, ErlDrvTermData *tag, long *length) {
-  ErlDrvTermData *term;
-  ErlDrvTermData  spec[9];
-  term = driver_alloc(sizeof(spec));
-  if (term == NULL) return NULL;
-  
-  spec[0] = ERL_DRV_ATOM;
-  spec[1] = *tag;
-  spec[2] = ERL_DRV_PORT;
-  spec[3] = driver_mk_port(*port);
-  /*if (result->format == Binary) {
-    spec[4] = ERL_DRV_BINARY; 
-    spec[5] = (ErlDrvBinary*)payload; 
-    spec[6] = ERL_DRV_UINT;
-    spec[7] = result->size;
-  } else {*/
-  spec[4] = ERL_DRV_BUF2BINARY;
-  spec[5] = payload;
-  spec[6] = strlen(payload);
-  /*}*/
-  spec[7] = ERL_DRV_TUPLE; 
-  spec[8] = 3;
-  
-  memcpy(term, &spec, sizeof(spec));
-  *length = sizeof(spec) / sizeof(spec[0]);
-  return term;
-};
-
-static void apply_transform(void *asd) {
-  AsyncState* data = (AsyncState*)asd;
-  DriverHandle* driver = data->driver;
-  XslEngine* engine = driver->engine;
-  Command* command = data->command;
-  data->state = engine->transform(command);
-  DBG("output buffer: %s\n", command->result->payload.buffer);
-};
-
-static void
-free_iov(DriverIOVec *iov) {
-  if (iov != NULL) {
-    if (iov->type == Text) {
-      DBG("Freeing iov buffer %s\n", iov->payload.buffer);
-      DRV_FREE(iov->payload.buffer);
-    } else {
-      DBG("Freeing iov data %p\n", iov->payload.data);
-      DRV_FREE(iov->payload.data);
-    }
-    driver_free(iov);
-  }
-};
-
-static void
-free_parameters(ParameterListNode *current) {
-  ParameterListNode *next;
-  INFO("cleanup parameters\n");
-  while (current != NULL) {
-    INFO("current wasn't null!? - %p\n", current);
-    next = (ParameterListNode*)current->next;
-    INFO("next - %p\n", next);
-    DRV_FREE(current->key);
-    DRV_FREE(current->value);
-    DRV_FREE(current);
-    current = next;
-  }
-};
-
-static void
-free_document(InputDocument *doc) {
-  if (doc != NULL) {
-    free_iov(doc->iov);
-    driver_free(doc);
-  }
-};
-
-static void 
-free_task(XslTask *task) {
-  if (task != NULL) {
-    free_parameters(task->parameters);
-    free_document(task->input_doc);
-    free_document(task->xslt_doc);
-  }
-};
-
-static void
-free_command(Command *cmd) {
-  ASSERT(cmd != NULL);
-  if (cmd != NULL) {
-    if (strcmp("transform", cmd->command_string) == 0) {
-      free_task(cmd->command_data.xsl_task);
-    } else {
-      free_iov(cmd->command_data.iov);
-      DRV_FREE((char*)cmd->command_string);
-    }
-    DRV_FREE(cmd->context);
-    free_iov(cmd->result);  
-    driver_free(cmd);
-  }
-};
-
-static void 
-free_async_state(AsyncState *state) {
-  ASSERT(state != NULL);
-  if (state != NULL) {
-    free_command(state->command);
-    DRV_FREE(state);
-  }
-};
-
-static DriverIOVec*
-init_iov(DataFormat type, 
-         Int32 size, 
-         void *payload) {
-  
-  DriverIOVec *iov = (DriverIOVec*)driver_alloc(sizeof(DriverIOVec));
-  if (iov == NULL) return NULL;
-  
-  iov->dirty = (payload == NULL) ? 0 : 1;
-  iov->type = type;
-  iov->size = size;
-  if (type == Text) {
-    iov->payload.buffer = (char*)payload;
-  } else {
-    iov->payload.data = payload;
-  }
-  return iov;
-};
-
-static InputDocument*
-init_doc(InputType type, 
-         Int32 size, 
-         char *data) {
-  
-  InputDocument *doc = (InputDocument*)driver_alloc(sizeof(InputDocument));
-  if (doc == NULL) return NULL;
-  
-  doc->type = type;
-  if ((doc->iov = init_iov(Text, size, (void*)data)) == NULL) {
-    DRV_FREE(doc);
-    return NULL;
-  }
-  return doc;
-};
-
-static DriverState 
-init_task(XslTask *task, 
-          const PayloadSizeHeaders* const hsize, 
-          const InputSpecHeaders* const hspec, 
-          char* xml, 
-          char* xsl) {
-  
-  InputDocument *xmldoc;
-  InputDocument *xsldoc;
-  
-  if ((xmldoc = init_doc((InputType)hspec->input_kind, 
-      hsize->input_size, xml)) == NULL) {
-    DRV_FREE(xml);
-    DRV_FREE(xsl);  
-    return OutOfMemoryError;
-  }
-      
-  if ((xsldoc = init_doc((InputType)hspec->xsl_kind, 
-      hsize->xsl_size, xsl)) == NULL) {  
-    free_document(xmldoc);
-    DRV_FREE(xml);
-    DRV_FREE(xsl);
-    return OutOfMemoryError;  
-  }
-  
-  task->input_doc = xmldoc;
-  task->xslt_doc = xsldoc;
-  task->parameters = NULL;
-  return Success;
-};
-
-static Command*
-init_command(const char *command, DriverContext *context, XslTask* xsl_task, DriverIOVec* iov) {
-  Command *cmd; 
-  if ((cmd = (Command*)driver_alloc(sizeof(Command))) == NULL) return NULL;
-  if ((cmd->result = try_driver_alloc(context->port, sizeof(DriverIOVec), cmd)) == NULL) return NULL;
-  if (xsl_task != NULL) {
-    cmd->command_data.xsl_task = xsl_task;
-  } else {
-    cmd->command_data.iov = iov;
-  }
-  cmd->command_string = command;
-  cmd->context = context;
-  cmd->alloc = driver_alloc;
-  cmd->release = driver_free;
-  return cmd;
-};
+// often used message constants
+static const char* const unknown_command = "Unknown Command!";
+static const char* const heap_space_exhausted = "Out of Memory!";
+static const char* const transform_command = "transform";
+static const char* const unsupported_response_type = "Unsupported Response Type.";
 
 /* DRIVER CALLBACK FUNCTIONS */
 
@@ -481,7 +56,7 @@ start_driver(ErlDrvPort port, char *buff) {
       return ERL_DRV_ERROR_GENERAL;
   }
 
-  DriverHandle *d = (DriverHandle*)driver_alloc(sizeof(DriverHandle));
+  DriverHandle *d = (DriverHandle*)ALLOC(sizeof(DriverHandle));
   if (d == NULL) {
     return ERL_DRV_ERROR_GENERAL; // TODO: use ERL_DRV_ERROR_ERRNO and provide out-of-memory info
   }
@@ -523,7 +98,7 @@ call(ErlDrvData drv_data, unsigned int command, char *buf,
   if (command == INIT_COMMAND) {
     ei_get_type(buf, &index, &type, &size);
     INFO("ei_get_type %s of size = %i\n", ((char*)&type), size);
-    data = driver_alloc(size + 1); 
+    data = ALLOC(size + 1); 
     ei_decode_string(buf, &index, data);
     INFO("Driver received data %s\n", data);
     state = init_provider(d, data);
@@ -603,8 +178,8 @@ outputv(ErlDrvData drv_data, ErlIOVec *ev) {
   ErlDrvTermData callee_pid = driver_caller(port);
   // assert(ev->binv[1] != NULL)    
   
-  if ((xml = (char*)driver_alloc(sizeof(char) * (hsize.input_size + 1))) == NULL) {
-    driver_failure_atom(port, "system_limit");
+  if ((xml = (char*)ALLOC(sizeof(char) * (hsize.input_size + 1))) == NULL) {
+    FAIL(port, "system_limit");
     return;
   }
   if ((xsl = (char*)try_driver_alloc(port, 
@@ -624,7 +199,7 @@ outputv(ErlDrvData drv_data, ErlIOVec *ev) {
   asd->driver = d;
   if ((asd->command = init_command(transform_command, ctx, job, NULL)) == NULL) {
     free_async_state(asd);
-    driver_failure_atom(port, "system_limit");
+    FAIL(port, "system_limit");
     return;
   }
   
@@ -644,7 +219,7 @@ outputv(ErlDrvData drv_data, ErlIOVec *ev) {
   switch (state) {
   case OutOfMemoryError:
     free_async_state(asd);
-    driver_failure_atom(port, "system_limit"); 
+    FAIL(port, "system_limit"); 
     return;
   case Success:
     /*
@@ -691,7 +266,7 @@ ready_async(ErlDrvData drv_data, ErlDrvThreadData data) {
   if (state == OutOfMemoryError) {
     ERROR("Driver Out Of Memory!\n");
     free_async_state(async_state);
-    driver_failure_atom(port, "system_limit");
+    FAIL(port, "system_limit");
     // this statement [above] will cause the driver to unload, so we may as well fail fast....
     return;
   }
@@ -715,7 +290,7 @@ ready_async(ErlDrvData drv_data, ErlDrvThreadData data) {
     // give the XslEngine a chance to try and clean up!?
     // state = provider->after_transform(command);
 
-    driver_failure_atom(port, "system_limit");
+    FAIL(port, "system_limit");
     // this statement [above] will cause the driver to unload, so we may as well fail fast....
     return;
   }
