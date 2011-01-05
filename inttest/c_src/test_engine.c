@@ -1,5 +1,5 @@
 /*
- * default_provider.c
+ * test_engine.c
  * 
  * -----------------------------------------------------------------------------
  * Copyright (c) 2008-2010 Tim Watson (watson.timothy@gmail.com)
@@ -22,9 +22,8 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  * -----------------------------------------------------------------------------
- * Notes: 
- * 
- *
+ * Notes: This *test* driver is used to validate the interactions between the 
+ * port controller and the linked in driver and port program code.
  */
 
 #include "erlxsl.h"
@@ -58,18 +57,14 @@ default_handleTransform(Command *command) {
   assert(task->input_doc != NULL);  
   assert(task->xslt_doc != NULL);
 
-  DBG("Checking buffer size\n");  
   Int32 buffersize = (get_doc_size(task->input_doc) + get_doc_size(task->xslt_doc) + 1); 
   DBG("Assigning result buffer of %i\n", buffersize);  
   if (!assign_result_buffer(buffersize, command)) {
     return OutOfMemoryError;
   }
   
-  DBG("concatenating documents\n");
-  
   char *input = get_doc_buffer(task->input_doc);
   assert(input != NULL);
-  
   char *stylesheet = get_doc_buffer(task->xslt_doc);
   assert(stylesheet != NULL);
   

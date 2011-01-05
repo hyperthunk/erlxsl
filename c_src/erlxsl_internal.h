@@ -107,7 +107,7 @@ typedef struct request_buffer_argument_outline {
   Int16  name_size;
   /* size of the argument value string in the buffer. */
   Int16  value_size;
-} arg_spec_hdr;
+} ParameterSpecHeaders;
 
 /* Used as a handle during async processing */ 
 typedef struct {
@@ -137,22 +137,39 @@ static void *_dlopen(const char*);
 static void *_dlopen(const char*);
 #endif
 
+/* Attempt to load the shared object library specified by the supplied LoaderSpec */
 static void load_library(LoaderSpec*);
+/* Attempts to initialize the XSLT engine provider */
 static DriverState init_provider(DriverHandle*, char*);
+/* Async callback wrapper that takes an AsyncState struct, applies the engine function and stores the result */
 static void apply_transform(void*);
+/* Free all memory associated with the supplied DriverIOVec (including all referenced data). */
 static void free_iov(DriverIOVec*);
+/* Free all memory associated with the supplied ParameterListNode (including all referenced data). */
 static void free_parameters(ParameterListNode*);
+/* Free all memory associated with the supplied InputDocument (including all referenced data). */
 static void free_document(InputDocument*);
+/* Free all memory associated with the supplied XslTask (including all referenced data). */
 static void free_task(XslTask*);
+/* Free all memory associated with the supplied Command (including all referenced data). */
 static void free_command(Command *cmd);
+/* Free all memory associated with the supplied AsyncState (including all referenced data). */
 static void free_async_state(AsyncState*);
+/* Allocate and initialize a DriverIOVec structure with the supplied 
+   arguments (presets all fields appropriately). Returns NULL on failure. */
 static DriverIOVec* init_iov(DataFormat, Int32, void*);
+/* Allocate and initialize an InputDocument structure with the supplied 
+   arguments (presets all fields appropriately). Returns NULL on failure. */
 static InputDocument* init_doc(InputType, Int32, char*);
+/* Initialize the supplied XslTask structure with the supplied arguments 
+   (presets all fields appropriately). Returns the appropriate DriverState to indicate the result. */
 static DriverState 
 init_task(XslTask*, 
           const PayloadSizeHeaders* const, 
           const InputSpecHeaders* const, 
           char*, char*);
+/* Allocate and initialize a Command structure with the supplied arguments 
+   (presets all fields appropriately). Returns NULL on failure. */
 static Command* init_command(const char*, DriverContext*, XslTask*, DriverIOVec*);
 
 /* MACROS */

@@ -59,14 +59,17 @@ static ErlDrvTermData atom_error;
 
 /* FORWARD DEFINES */
 
+/* makes a tagged tuple (using the driver term format) for the supplied binary payload. */
 static ErlDrvTermData* make_driver_term_bin(ErlDrvPort*, ErlDrvBinary*, ErlDrvTermData*, long*);
+
+/* makes a tagged tuple (using the driver term format) for the supplied buffer payload. */
 static ErlDrvTermData* make_driver_term(ErlDrvPort*, char*, ErlDrvTermData*, long*);
 
-#include "erlxsl_internal.h"  // we want the utility functions now
+/* we want all the internal utility functions and any additional includes now. */
+#include "erlxsl_internal.h"
 
 /* INTERNAL UTILITY FUNCTIONS */
 
-/* makes a tagged tuple (using the driver term format) for the supplied binary payload. */
 static ErlDrvTermData* 
 make_driver_term_bin(ErlDrvPort *port, ErlDrvBinary *payload, ErlDrvTermData *tag, long *length) {
   ErlDrvTermData *term;

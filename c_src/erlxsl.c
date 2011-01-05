@@ -38,7 +38,7 @@
 
 /* INTERNAL DATA & DATA STRUCTURES */
 
-// often used message constants
+// often used constants
 static const char* const unknown_command = "Unknown Command!";
 static const char* const heap_space_exhausted = "Out of Memory!";
 static const char* const transform_command = "transform";
@@ -46,6 +46,7 @@ static const char* const unsupported_response_type = "Unsupported Response Type.
 
 /* DRIVER CALLBACK FUNCTIONS */
 
+// Called by the emulator when the driver is starting.
 static ErlDrvData 
 start_driver(ErlDrvPort port, char *buff) {
   atom_result = driver_mk_atom("result");
@@ -64,6 +65,7 @@ start_driver(ErlDrvPort port, char *buff) {
   return (ErlDrvData)d;
 };
 
+// Called by the emulator when the driver is stopping.
 static void 
 stop_driver(ErlDrvData drv_data) {
   // give the provider a chance to clean up
@@ -79,6 +81,27 @@ stop_driver(ErlDrvData drv_data) {
   driver_free((char*)drv_data);
 };
 
+/*
+This function is called from erlang:port_call/3. It works a lot like the control call-back, 
+but uses the external term format for input and output. 
+- command is an integer, obtained from the call from erlang (the second argument to erlang:port_call/3). 
+- buf and len provide the arguments to the call (the third argument to erlang:port_call/3). They're decoded using ei.
+- rbuf points to a return buffer, rlen bytes long.  
+
+The return data (written to *rbuf) should be a valid erlang term in the external term format. This is converted to an 
+erlang term and returned by erlang:port_call/3 to the caller. If more space than rlen bytes is needed to return data, 
+*rbuf can be set to memory allocated with driver_alloc. This memory will be freed automatically after call has returned.
+The return value (of this callback function) is the number of bytes returned in *rbuf. If ERL_DRV_ERROR_GENERAL is returned 
+(or in fact, anything < 0), erlang:port_call/3 will throw a BAD_ARG.
+
+THIS IMPLEMENTATION of the callback handles two kinds of commands, INIT_COMMAND and ENGINE_COMMAND. An INIT_COMMAND should 
+only be issued once during the lifecycle of the driver, *before* any data is sent to the port using port_command/port_control.
+The INIT_COMMAND causes the driver to load the specified shared library and call a predefined entry point (see the 
+erlxsl_driver header file for details) to initialize an XslEngine structure. 
+
+TODO: document ENGINE_COMMAND. 
+TODO: locking during ENGINE_COMMAND calls when running in SMP mode (as other threads could be accessing shared data)
+*/
 static int 
 call(ErlDrvData drv_data, unsigned int command, char *buf, 
   int len, char **rbuf, int rlen, unsigned int *flags) {
@@ -125,6 +148,18 @@ call(ErlDrvData drv_data, unsigned int command, char *buf,
   return(rindex);
 };
 
+/*
+This function is called whenever the port is written to. The port should be in binary mode, see open_port/2.
+The ErlIOVec contains both a SysIOVec, suitable for writev, and one or more binaries. If these binaries should be retained, 
+when the driver returns from outputv, they can be queued (using driver_enq_bin for instance), or if they are kept in a 
+static or global variable, the reference counter can be incremented.
+
+THIS IMPLEMENTATION of the callback unpacks a set of headers from the input binary (which is packed by the port_controller
+process using erlxsl_marshall:pack/4 before being submitted) and constructs a Command object which is then submitted to 
+the XslEngine. When the emulator is running in SMP mode, the actual processing is done on an async thread (using the 
+driver_async submission mechanism) and the apply_transform function is used to wrap the XslEngine callback functions. The 
+results of processing are handled on a main emulator thread in the ready_async driver callback. 
+*/
 static void 
 outputv(ErlDrvData drv_data, ErlIOVec *ev) {
   char *error_msg;
@@ -244,10 +279,14 @@ outputv(ErlDrvData drv_data, ErlIOVec *ev) {
   }  
 };
 
-/*
- * Processes the supplied transform_result and sends it to the appropriate
- * erlang process (e.g. the specified receiver)
- */
+/* 
+This function is called after an asynchronous call has completed. The asynchronous 
+call is started with driver_async. This function is called from the erlang emulator thread, 
+as opposed to the asynchronous function, which is called in some thread (if multithreading is enabled).
+
+THIS IMPLEMENTATION of the callback, processes the supplied transform_result and sends it 
+to the appropriate erlang process (e.g. the specified receiver). 
+*/
 static void 
 ready_async(ErlDrvData drv_data, ErlDrvThreadData data) {
   long response_len;
