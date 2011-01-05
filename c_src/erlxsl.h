@@ -137,6 +137,18 @@ typedef int16_t   Int16;
 typedef int32_t   Int32;
 typedef int64_t   Int64;
 
+/* Indicates the transient state of a driver. */
+typedef enum {
+  Success,
+  InitOk,
+  LibraryNotFound,
+  EntryPointNotFound,
+  InitFailed,
+  OutOfMemory,
+  UnknownCommand,
+  UnsupportedOperationError
+} DriverState;
+
 /* Indicates the transient state of an XslEngine - used primarily for error reporting. */
 typedef enum {
   Ok,

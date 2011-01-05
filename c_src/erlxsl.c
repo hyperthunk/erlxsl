@@ -125,6 +125,11 @@ call(ErlDrvData drv_data, unsigned int command, char *buf,
     ei_decode_string(buf, &index, data);
     INFO("Driver received data %s\n", data);
     state = init_provider(d, data);
+  } else if (command == ENGINE_COMMAND) {
+    ei_get_type(buf, &index, &type, &size);
+    INFO("ei_get_type %s of size = %i\n", ((char*)&type), size);
+    data = ALLOC(size + 1); 
+    ei_decode_string(buf, &index, data);
   } else {
     state = UnknownCommand;
   }

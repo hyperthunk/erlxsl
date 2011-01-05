@@ -50,6 +50,7 @@ static ErlDrvTermData atom_error;
 
 // magics for command identification
 #define INIT_COMMAND (UInt32)9
+#define ENGINE_COMMAND (UInt32)7
 
 // NULL safe driver_free wrapper
 #define DRV_FREE(x) if (x != NULL) driver_free(x)

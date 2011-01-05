@@ -44,16 +44,6 @@
 
 /* INTERNAL DATA & DATA STRUCTURES */
 
-typedef enum {
-  Success,
-  InitOk,
-  LibraryNotFound,
-  EntryPointNotFound,
-  InitFailed,
-  OutOfMemory,
-  UnknownCommand
-} DriverState;
-
 // typedef void InitEngineFunc(xsl_engine* engine);
 typedef void (*init_func)(XslEngine*);
 
@@ -180,7 +170,7 @@ static Command* init_command(const char*, DriverContext*, XslTask*, DriverIOVec*
 
 /* INTERNAL DRIVER FUNCTIONS */
 
-/* Tries to allocate head space of 'size'. If this fails, the pointers 
+/* Tries to allocate heap space of 'size'. If this fails, the pointers 
    in the varags array are freed one by one and the program fails. */ 
 static void* try_driver_alloc(void *port, size_t size, void* pfree, ...) {
   void* val = ALLOC(size);
@@ -435,6 +425,16 @@ init_task(XslTask *task,
   return Success;
 };
 
+static inline void* 
+internal_alloc(size_t size) {
+  return ALLOC(size);
+};
+
+static inline 
+void internal_free(void *p) {
+  DRV_FREE(p);
+};
+
 static Command*
 init_command(const char *command, DriverContext *context, XslTask *xsl_task, DriverIOVec *iov) {
   Command *cmd; 
@@ -447,8 +447,8 @@ init_command(const char *command, DriverContext *context, XslTask *xsl_task, Dri
   }
   cmd->command_string = command;
   cmd->context = context;
-  cmd->alloc = driver_alloc;
-  cmd->release = driver_free;
+  cmd->alloc = internal_alloc;
+  cmd->release = internal_free;
   return cmd;
 };
 
