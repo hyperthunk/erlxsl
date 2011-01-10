@@ -229,6 +229,8 @@ static void *_dlopen(const char *file) {
 
 static void
 load_library(LoaderSpec *dest) {
+  if (dest == NULL) return;
+  
   char *libload_failure = "Unable to load xslt provider library.";
   char *entrypoint_failure = "Unable to locate entry point 'init_engine'.";
   

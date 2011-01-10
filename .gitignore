@@ -21,3 +21,4 @@ ebin/erlxsl_port_server.erl
 ebin/erlxsl_sup.erl
 .komodotools
 MyProject.komodoproject
+inttest/spec/all_specs.c

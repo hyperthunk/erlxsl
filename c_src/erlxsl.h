@@ -28,6 +28,9 @@
  *
  */
 
+#ifndef _ERLXSL_H
+#define  _ERLXSL_H
+
 /* pervasive includes */
 #include <stdio.h>
 #include <string.h>
@@ -40,9 +43,6 @@
 #endif
 
 #include <assert.h>
-
-#ifndef _ERLXSL_H
-#define  _ERLXSL_H
 
 #ifdef  __cplusplus
 extern "C" {

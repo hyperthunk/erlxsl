@@ -32,15 +32,10 @@
 #include "erlxsl_port.h"
 #include "erlxsl_internal.h"
 
-describe "Loading XslEngine from a Shared Library (so)"
-  it "should guard against null loader specs"
-    load_library(NULL);
-  end
-  
-  it "should yield error data for invalid library names"
-    LoaderSpec *loader = ALLOC(sizeof(LoaderSpec));
-    
-    loader should not equal NULL
-    DRV_FREE(loader);
+describe "API Calls and Macros"
+  it "the ALLOC macro should work!"
+    char *foo = ALLOC(sizeof(char) * 10);
+    foo should not equal NULL
+    DRV_FREE(foo);
   end
 end
