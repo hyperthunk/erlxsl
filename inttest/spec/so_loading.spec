@@ -32,6 +32,19 @@
 #include "erlxsl_port.h"
 #include "erlxsl_internal.h"
 
+static char *bad_image_name = "no_such_library.so";
+
+// FIXME: need a cross platform build that copes with different path schemes
+
+static char *ok_image_name_bad_format = "priv/test/bin/test_harness";
+
+#define match_have_error(A, E) \
+  (strcmp(A, E) == 0)
+
+#define BAD_IMAGE_ERROR       \
+    "dlopen(priv/test/bin/test_harness, 2): no suitable image found." \
+    "  Did find:\n\t../priv/test/bin/test_harness: can't map"
+
 describe "Loading XslEngine from a Shared Library (so)"
   it "should guard against null loader specs"
     load_library(NULL);
@@ -40,7 +53,24 @@ describe "Loading XslEngine from a Shared Library (so)"
   it "should yield error data for invalid library names"
     LoaderSpec *loader = ALLOC(sizeof(LoaderSpec));
     
-    loader should not equal NULL
+    loader->name = bad_image_name;
+    load_library(loader);
+    
+    loader->library should be NULL;
+    loader->error_message should have_error "dlopen(no_such_library.so, 2): image not found";
+    
+    DRV_FREE(loader);
+  end
+  
+  it "should yield error data for invalid entry points"
+    LoaderSpec *loader = ALLOC(sizeof(LoaderSpec));
+    
+    loader->name = ok_image_name_bad_format;
+    load_library(loader);
+    
+    loader->library should be NULL;
+    loader->error_message should have_error BAD_IMAGE_ERROR;
+    
     DRV_FREE(loader);
   end
 end

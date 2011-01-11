@@ -161,6 +161,8 @@ init_task(XslTask*,
 /* Allocate and initialize a Command structure with the supplied arguments 
    (presets all fields appropriately). Returns NULL on failure. */
 static Command* init_command(const char*, DriverContext*, XslTask*, DriverIOVec*);
+static char *libload_failure = "Unable to load xslt provider library.";
+char *entrypoint_failure = "Unable to locate entry point 'init_engine'.";
 
 /* MACROS */
 
@@ -231,15 +233,13 @@ static void
 load_library(LoaderSpec *dest) {
   if (dest == NULL) return;
   
-  char *libload_failure = "Unable to load xslt provider library.";
-  char *entrypoint_failure = "Unable to locate entry point 'init_engine'.";
-  
   if ((dest->library = _dlopen((const char*)dest->name)) == NULL) {
-    INFO("dlopen failed with %s'\n", dlerror());
+    DBG("dlopen failed with %s'\n", dlerror());
     set_dlerror(dest, libload_failure);
+    return;
   }
   
-  printf("library %s = %p\n", dest->name, dest->library);
+  DBG("library %s = %p\n", dest->name, dest->library);
 
   if ((dest->init_f = dlsym(dest->library, init_entry_point)) == NULL) {
     set_dlerror(dest, entrypoint_failure);
