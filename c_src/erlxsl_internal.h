@@ -307,11 +307,11 @@ free_iov(DriverIOVec *iov) {
 static void
 free_parameters(ParameterListNode *current) {
   ParameterListNode *next;
-  INFO("cleanup parameters\n");
+  DBG("cleanup parameters\n");
   while (current != NULL) {
-    INFO("current wasn't null!? - %p\n", current);
+    DBG("current wasn't null!? - %p\n", current);
     next = (ParameterListNode*)current->next;
-    INFO("next - %p\n", next);
+    DBG("next - %p\n", next);
     DRV_FREE(current->key);
     DRV_FREE(current->value);
     DRV_FREE(current);
@@ -396,12 +396,33 @@ init_doc(InputType type,
   return doc;
 };
 
+static void clear_task_fields(XslTask* t) {
+  t->input_doc = t->xslt_doc = NULL;
+  t->parameters = NULL;
+};
+
 static DriverState 
 init_task(XslTask *task, 
           const PayloadSizeHeaders* const hsize, 
           const InputSpecHeaders* const hspec, 
           char* xml, 
           char* xsl) {
+  
+  if (task == NULL) {
+    return BadArgumentError;
+  }
+  clear_task_fields(task);
+  
+  if (hsize == NULL || hspec == NULL || xml == NULL || xsl == NULL) {
+    return BadArgumentError;
+  }
+  
+  if (hsize->input_size == 0 || hsize->xsl_size == 0) {
+    return EmptyBufferError;
+  }
+  
+  assert(hsize->input_size == strlen(xml));
+  assert(hsize->xsl_size == strlen(xsl));
   
   InputDocument *xmldoc;
   InputDocument *xsldoc;

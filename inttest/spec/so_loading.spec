@@ -28,9 +28,7 @@
  */
 
 #include "cspec.h"
-#include "erlxsl.h"
-#include "erlxsl_port.h"
-#include "erlxsl_internal.h"
+#include "spec_includes.h"
 
 static char *stub_entry_point = "initialize_me";
 static char *bad_image_name = "no_such_library.so";

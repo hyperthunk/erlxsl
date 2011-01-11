@@ -1,0 +1,40 @@
+
+n.n.n / 2011-01-11 
+==================
+
+  * test DriverIOVec init function
+  * add image loading spec; build only works for Darwin FTM
+  * update the build so that cspec tests are bundled properly
+  * add cspec build integration
+  * add test harness
+  * add a light sprinkling of comments to the code
+  * factor includes to separate linked-in driver code from general purpose functions
+  * rewrite for new data structures API; back in the green
+  * rewrite using cleaner api (esp. data types)
+  * refactor api data structures
+  * rename erlxsl api header
+  * switch tests to hamcrest
+  * no more tabs
+  * consolidate load_library; pass full path to dlopen (temporary fix)
+  * rename port_server to port_controller
+  * load (native) xslt engine/library dynamically
+  * refactor port_server to use state record
+  * fix marshall tests to actually run; turn on code coverage; fix ct using test config to specify .so file correctly when cover compiled modules in use
+  * adding cover.spec
+  * fix marshall tests
+  * additional tests for marshalling
+  * support application:stop/1 and teardown; control logging (on/off) via options; ct move to application start/stop on init/end per_suite
+  * switch to stdint.h; return to sender (not port owner); fire requests to gen_server:call/2 and receive response;
+  * pulling protocol back together; darwin working; pulling typedefs from APR; build changes
+  * driver protocol fixing;
+  * fix logging; add supervision tree; fix app startup; driver initialisation works; driver xsl protocol broken; default config needs fixing
+  * embedding rebar; providing Makefile;
+  * initialise driver synchronously; pack request data; basic port server
+  * migrating port control process from the older prototype.
+  * gradual refactoring
+  * getting semblance of order - compile now works. :)
+  * fleshing out the APIs (still no build system)
+  * slowly bringing old code base back in
+  * Creating Skeleton Application
+  * adding rebar config
+  * Initial Commit

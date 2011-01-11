@@ -28,9 +28,7 @@
  */
 
 #include "cspec.h"
-#include "erlxsl.h"
-#include "erlxsl_port.h"
-#include "erlxsl_internal.h"
+#include "spec_includes.h"
 
 describe "API Calls and Macros"
   it "the ALLOC macro should work!"

@@ -42,7 +42,10 @@
 #define NDEBUG    // prevent assert from happening!
 #endif
 
+// we also allow test cases to override the *normal* assert behaviour
+#ifndef _TEST_ASSERT
 #include <assert.h>
+#endif
 
 #ifdef  __cplusplus
 extern "C" {
@@ -146,7 +149,9 @@ typedef enum {
   InitFailed,
   OutOfMemory,
   UnknownCommand,
-  UnsupportedOperationError
+  UnsupportedOperationError,
+  BadArgumentError,
+  EmptyBufferError
 } DriverState;
 
 /* Indicates the transient state of an XslEngine - used primarily for error reporting. */

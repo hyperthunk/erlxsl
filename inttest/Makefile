@@ -2,7 +2,7 @@
 CC ?= gcc
 LEG ?= leg
 DARWIN = $(shell uname | awk '/Darwin/ { print "-D_DARWIN" }')
-CFLAGS = -std=c99 -fPIC -I ../c_src -I deps/cspec/src -Wall
+CFLAGS = -std=c99 -fPIC -I ../c_src -I deps/cspec/src -Werror
 LIB = deps/cspec/build/cspec.o
 BINDIR = bin
 SPECS = $(shell find spec -name so_*.spec)
@@ -25,8 +25,8 @@ clean:
 compile: deps/cspec
 	@(gcc $(CFLAGS) -o ../priv/test/bin/test_harness c_src/test_harness.c)
 
+# TODO: make this work on windows.....
 test: $(TESTBIN)
-	# TODO: make this work on windows.....
 	@(env LD_LIBRARY_PATH=../priv/test/bin:$$LD_LIBRARY_PATH ./$(TESTBIN))
 
 $(TESTLIB):

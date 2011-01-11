@@ -1,5 +1,5 @@
 /*
- * erlxsl_driver.h
+ * init_types.spec
  * 
  * -----------------------------------------------------------------------------
  * Copyright (c) 2008-2010 Tim Watson (watson.timothy@gmail.com)
@@ -22,34 +22,39 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  * -----------------------------------------------------------------------------
- * Notes: 
- * 
- * This header contains code specific to the shared object library used by the
- * linked-in driver. It depends on erl_driver and ei. This header *must* be 
- * included before the erlxsl_internal header.
- *
+ * Notes: If you're looking at a version of this file with the extension .c then
+ * you're looking at generated code. For the original test specifications, please
+ * look at the file with the .spec extension instead.
  */
 
-#ifndef _ERLXSL_PRT_H
-#define  _ERLXSL_PRT_H
+#ifndef _SPEC_INCL_H
+#define _SPEC_INCL_H
+
+#include "cspec.h"
+#include <stdbool.h>
+
+bool allow_allocations = true;
+char assert_failed[2046];
+
+// overwrite ALLOC macro
+
+void *_spec_alloc(size_t size) {
+  return ((allow_allocations == true) ? malloc(size) : NULL);
+};
+
+#define ALLOC(size) _spec_alloc(size)
+
+// override 'assert' behaviour
+
+#define _TEST_ASSERT true
+
+#define assert(_s)  \
+  (!(_s) \
+    ? (strcpy(assert_failed, #_s))  \
+    : ((void) 0))
 
 #include "erlxsl.h"
+#include "erlxsl_port.h"
+#include "erlxsl_internal.h"
 
-// driver_alloc wrapper
-#ifndef ALLOC
-#define ALLOC(size) malloc(size)
-#endif
-
-// magics for command identification
-#define INIT_COMMAND (UInt32)9
-#define ENGINE_COMMAND (UInt32)7
-
-// NULL safe driver_free wrapper
-#define DRV_FREE(x) if (x != NULL) free(x)
-
-// Cause the driver to fail (e.g., exit/unload)
-#define FAIL(p, msg)  \
- ERROR(msg);          \
- exit(1);
-
-#endif /* _ERLXSL_PRT_H */
+#endif /* _SPEC_INCL_H */
