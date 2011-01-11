@@ -32,7 +32,9 @@
 #include "erlxsl_port.h"
 #include "erlxsl_internal.h"
 
+static char *stub_entry_point = "initialize_me";
 static char *bad_image_name = "no_such_library.so";
+static char *good_image_name = "bin/lib_stub.so";
 
 // FIXME: need a cross platform build that copes with different path schemes
 
@@ -62,7 +64,7 @@ describe "Loading XslEngine from a Shared Library (so)"
     DRV_FREE(loader);
   end
   
-  it "should yield error data for invalid entry points"
+  it "should yield error data for images of invalid type/format"
     LoaderSpec *loader = ALLOC(sizeof(LoaderSpec));
     
     loader->name = ok_image_name_bad_format;
@@ -71,6 +73,31 @@ describe "Loading XslEngine from a Shared Library (so)"
     loader->library should be NULL;
     loader->error_message should have_error BAD_IMAGE_ERROR;
     
+    DRV_FREE(loader);
+  end
+
+  it "should yield error data for images missing the correct entry point"
+    LoaderSpec *loader = ALLOC(sizeof(LoaderSpec));
+
+    loader->name = good_image_name;
+    load_library(loader);
+
+    loader->library should not be NULL;
+    loader->error_message should include "init_engine): symbol not found";
+
+    DRV_FREE(loader);
+  end
+
+  it "should load the correct entry point (when present)"
+    LoaderSpec *loader = ALLOC(sizeof(LoaderSpec));
+
+    loader->name = good_image_name;
+    load_library(loader);
+
+    loader->library should not be NULL;
+    loader->init_f = dlsym(loader->library, stub_entry_point);    
+    loader->init_f should not be NULL;
+
     DRV_FREE(loader);
   end
 end
