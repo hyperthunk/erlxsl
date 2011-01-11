@@ -1,4 +1,9 @@
 
+0.1.0 / 2011-01-11 
+==================
+
+  * test for init behaviour when malloc fails
+
 n.n.n / 2011-01-11 
 ==================
 
