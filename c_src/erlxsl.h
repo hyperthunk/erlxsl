@@ -45,6 +45,7 @@
 // we also allow test cases to override the *normal* assert behaviour
 #ifndef _TEST_ASSERT
 #include <assert.h>
+#define ASSERT(stmt) assert(stmt)
 #endif
 
 #ifdef  __cplusplus

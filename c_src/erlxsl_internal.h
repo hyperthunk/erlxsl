@@ -338,7 +338,7 @@ free_task(XslTask *task) {
 
 static void
 free_command(Command *cmd) {
-  assert(cmd != NULL);
+  ASSERT(cmd != NULL);
   if (cmd != NULL) {
     if (strcmp("transform", cmd->command_string) == 0) {
       free_task(cmd->command_data.xsl_task);
@@ -354,7 +354,7 @@ free_command(Command *cmd) {
 
 static void 
 free_async_state(AsyncState *state) {
-  assert(state != NULL);
+  ASSERT(state != NULL);
   if (state != NULL) {
     free_command(state->command);
     DRV_FREE(state);
@@ -421,8 +421,8 @@ init_task(XslTask *task,
     return EmptyBufferError;
   }
   
-  assert(hsize->input_size == strlen(xml));
-  assert(hsize->xsl_size == strlen(xsl));
+  ASSERT(hsize->input_size == strlen(xml));
+  ASSERT(hsize->xsl_size == strlen(xsl));
   
   InputDocument *xmldoc;
   InputDocument *xsldoc;

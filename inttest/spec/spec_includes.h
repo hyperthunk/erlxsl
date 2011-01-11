@@ -52,7 +52,7 @@ void *_spec_alloc(size_t size) {
 
 #define _TEST_ASSERT true
 
-#define assert(_s)  \
+#define ASSERT(_s)  \
   (!(_s) \
     ? (strcpy(assert_failed, #_s))  \
     : ((void) 0))
