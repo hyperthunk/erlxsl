@@ -127,6 +127,12 @@ describe "Initializing DriverIOVec Structures"
 end
 
 describe "Initializing InputDocument Structures"
+  it "should return NULL when allocation fails"
+    InputDocument *doc;
+    do_with_nomem(doc = init_doc(Stream, 0, NULL));
+    doc should be NULL;
+  end
+
   it "should set the input type to text and size the DriverIOVec appropriately"
     create_test_data(test_data, payload);
     InputDocument *doc = init_doc(Stream, strlen(test_data), test_data);
@@ -297,6 +303,27 @@ describe "Initializing XslTask Structures"
 
     free_task(task);
   end  
+
+  it "should fail when no memory is available to allocate InputDocument(s)"
+    PayloadSizeHeaders hsize;
+    InputSpecHeaders hspec;
+
+    create_test_data(test_xml, input_doc);
+    create_test_data(test_xsl, xsl_doc);
+    setup_size_headers(hsize, test_xml, test_xsl);
+    setup_spec_headers(hspec, Buffer, Buffer, 0);
+
+    XslTask *task = (XslTask*)ALLOC(sizeof(XslTask)); 
+    DriverState state; 
+    do_with_nomem(
+      state = init_task(task, 
+        (const PayloadSizeHeaders* const)&hsize, 
+        (const InputSpecHeaders* const)&hspec,
+        test_xml, test_xsl));
+
+    state should be OutOfMemory;
+    free_task(task);
+  end
 
   it "should set the input type to text and size the DriverIOVec appropriately"
     PayloadSizeHeaders hsize;

@@ -44,6 +44,10 @@ void *_spec_alloc(size_t size) {
 
 #define ALLOC(size) _spec_alloc(size)
 
+#define do_with_nomem(stmt) \
+  allow_allocations = false; stmt; \
+  allow_allocations = true
+
 // override 'assert' behaviour
 
 #define _TEST_ASSERT true
