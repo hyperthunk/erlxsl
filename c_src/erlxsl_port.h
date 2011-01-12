@@ -45,7 +45,10 @@
 #define ENGINE_COMMAND (UInt32)7
 
 // NULL safe driver_free wrapper
+#ifndef _DRV_FREE
+#define _DRV_FREE
 #define DRV_FREE(x) if (x != NULL) free(x)
+#endif
 
 // Cause the driver to fail (e.g., exit/unload)
 #define FAIL(p, msg)  \

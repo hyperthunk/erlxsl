@@ -67,6 +67,17 @@ void *_spec_alloc(size_t size) {
     ? (strcpy(assert_failed, #_s))  \
     : ((void) 0))
 
+void _spec_free(void *x) {
+  if (x != NULL) {
+    free(x);
+  }
+};
+
+#define _DRV_FREE
+#define DRV_FREE(x) \
+  do { DBG("Free " #x " [%p]", x); \
+    _spec_free(x); } while (false)
+
 #include "erlxsl.h"
 #include "erlxsl_port.h"
 #include "erlxsl_internal.h"

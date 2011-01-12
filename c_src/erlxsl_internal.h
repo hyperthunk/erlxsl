@@ -343,10 +343,9 @@ free_command(Command *cmd) {
   if (cmd != NULL) {
     if (strcmp("transform", cmd->command_string) == 0) {
       free_task(cmd->command_data.xsl_task);
-    } else {
+    } else {    
       free_iov(cmd->command_data.iov);
     }
-    DRV_FREE((char*)cmd->command_string);
     free_iov(cmd->result);
     DRV_FREE(cmd);
   }

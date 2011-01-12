@@ -39,6 +39,7 @@ static char *payload = "some data....";
 static char *input_doc = "<doc><input @name='foobar'/></doc>";
 static char *xsl_doc = transform;
 static char *command_string = "transform";
+static char *internal_command_string = "command123";
 
 #define payload_size strlen(payload)
 
@@ -394,6 +395,26 @@ describe "Initializing Command Structures"
     XslTask *ptask = cmd->command_data.xsl_task;
     
     ptask should point_to task;
+    cmd->command_string should equal test_data;
+    
+    free_command(cmd);
+    DRV_FREE(ctx);
+  end
+
+  it "should assign the DriverIOVec if provided"
+    create_test_data(test_data, internal_command_string);    
+    DriverContext *ctx = (DriverContext*)ALLOC(sizeof(DriverContext));
+    ctx->port = NULL;
+    DriverIOVec *iov = init_iov(Text, 0, NULL);
+    Command *cmd;
+
+    cmd = init_command(test_data, ctx, NULL, iov);
+
+    DriverIOVec *piov = cmd->command_data.iov;
+
+    cmd->command_string should equal test_data;
+    piov should point_to iov;
+    
     free_command(cmd);
     DRV_FREE(ctx);
   end
