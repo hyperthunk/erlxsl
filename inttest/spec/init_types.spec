@@ -38,6 +38,7 @@
 static char *payload = "some data....";
 static char *input_doc = "<doc><input @name='foobar'/></doc>";
 static char *xsl_doc = transform;
+static char *command_string = "transform";
 
 #define payload_size strlen(payload)
 
@@ -58,6 +59,13 @@ static char *xsl_doc = transform;
   Spec.param_grp_arity = (Int16)Pg
 
 describe "Initializing DriverIOVec Structures"
+
+  it "should return NULL when allocation fails"
+    DriverIOVec *iov;
+    do_with_nomem(iov = init_iov(Text, 0, NULL));
+    iov should be NULL;
+  end
+
   it "should set the 'dirty bit' to zero when there is no payload"
     DriverIOVec *iov = init_iov(Text, 0, NULL);
     
@@ -356,5 +364,39 @@ describe "Initializing XslTask Structures"
     
     free_task(task);
   end
+end
+
+describe "Initializing Command Structures"
+
+  it "should return NULL when Command allocation fails"
+    Command *cmd;
+    do_with_nomem(
+      cmd = init_command(command_string, NULL, NULL, NULL));
+    cmd should be NULL;
+  end
+
+  it "should return NULL when DriverIOVec allocation fails"
+    Command *cmd;
+    with_denied_allocation(sizeof(DriverIOVec), 
+      cmd = init_command(command_string, NULL, NULL, NULL));
+    cmd should be NULL;
+  end
+
+  it "should assign the XslTask if provided"
+    create_test_data(test_data, command_string);    
+    DriverContext *ctx = (DriverContext*)ALLOC(sizeof(DriverContext));
+    ctx->port = NULL;
+    XslTask *task = (XslTask*)ALLOC(sizeof(XslTask)); 
+    clear_task_fields(task);
+    Command *cmd;
+    cmd = init_command(test_data, ctx, task, NULL);
+    
+    XslTask *ptask = cmd->command_data.xsl_task;
+    
+    ptask should point_to task;
+    free_command(cmd);
+    DRV_FREE(ctx);
+  end
+
 end
 

@@ -293,12 +293,14 @@ static void apply_transform(void *asd) {
 static void
 free_iov(DriverIOVec *iov) {
   if (iov != NULL) {
-    if (iov->type == Text) {
-      DBG("Freeing iov buffer %s\n", iov->payload.buffer);
-      DRV_FREE(iov->payload.buffer);
-    } else {
-      DBG("Freeing iov data %p\n", iov->payload.data);
-      DRV_FREE(iov->payload.data);
+    if (iov->dirty == 1) {
+      if (iov->type == Text) {
+        DBG("Freeing iov buffer %s\n", iov->payload.buffer);
+        DRV_FREE(iov->payload.buffer);
+      } else {
+        DBG("Freeing iov data %p\n", iov->payload.data);
+        DRV_FREE(iov->payload.data);
+      }
     }
     DRV_FREE(iov);
   }
@@ -338,16 +340,14 @@ free_task(XslTask *task) {
 
 static void
 free_command(Command *cmd) {
-  ASSERT(cmd != NULL);
   if (cmd != NULL) {
     if (strcmp("transform", cmd->command_string) == 0) {
       free_task(cmd->command_data.xsl_task);
     } else {
       free_iov(cmd->command_data.iov);
-      DRV_FREE((char*)cmd->command_string);
     }
-    DRV_FREE(cmd->context);
-    free_iov(cmd->result);  
+    DRV_FREE((char*)cmd->command_string);
+    free_iov(cmd->result);
     DRV_FREE(cmd);
   }
 };
@@ -461,8 +461,10 @@ void internal_free(void *p) {
 static Command*
 init_command(const char *command, DriverContext *context, XslTask *xsl_task, DriverIOVec *iov) {
   Command *cmd; 
-  if ((cmd = (Command*)ALLOC(sizeof(Command))) == NULL) return NULL;
-  if ((cmd->result = try_driver_alloc(context->port, sizeof(DriverIOVec), cmd)) == NULL) return NULL;
+  if ((cmd = (Command*)ALLOC(sizeof(Command))) == NULL) return NULL;  
+  if ((cmd->result = init_iov(Text, -1, NULL)) == NULL) {
+    return NULL;
+  }
   if (xsl_task != NULL) {
     cmd->command_data.xsl_task = xsl_task;
   } else {

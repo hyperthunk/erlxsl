@@ -34,12 +34,18 @@
 #include <stdbool.h>
 
 bool allow_allocations = true;
+size_t allow_allocation_sizes = -1;
 char assert_failed[2046];
 
 // overwrite ALLOC macro
 
 void *_spec_alloc(size_t size) {
-  return ((allow_allocations == true) ? malloc(size) : NULL);
+  if (allow_allocations == false) return NULL;
+  if (allow_allocation_sizes == -1 || allow_allocation_sizes == size) {
+    return malloc(size);
+  } else {
+    return NULL;
+  }
 };
 
 #define ALLOC(size) _spec_alloc(size)
@@ -47,6 +53,10 @@ void *_spec_alloc(size_t size) {
 #define do_with_nomem(stmt) \
   allow_allocations = false; stmt; \
   allow_allocations = true
+
+#define with_denied_allocation(size, stmt)  \
+  allow_allocation_sizes = size; stmt; \
+  allow_allocation_sizes = -1;
 
 // override 'assert' behaviour
 
