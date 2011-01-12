@@ -248,8 +248,8 @@ load_library(LoaderSpec *dest) {
 
 static DriverState 
 init_provider(DriverHandle *drv, char *buff) {
-  XslEngine *engine = (XslEngine*)ALLOC(sizeof(XslEngine));
-  LoaderSpec* lib = (LoaderSpec*)ALLOC(sizeof(LoaderSpec));
+  XslEngine *engine = ALLOC(sizeof(XslEngine));
+  LoaderSpec* lib = ALLOC(sizeof(LoaderSpec));
     
   if (engine == NULL || lib == NULL) {
     DRV_FREE(engine);
@@ -365,7 +365,7 @@ init_iov(DataFormat type,
          Int32 size, 
          void *payload) {
   
-  DriverIOVec *iov = (DriverIOVec*)ALLOC(sizeof(DriverIOVec));
+  DriverIOVec *iov = ALLOC(sizeof(DriverIOVec));
   if (iov == NULL) return NULL;
   
   iov->dirty = (payload == NULL) ? 0 : 1;
@@ -384,7 +384,7 @@ init_doc(InputType type,
          Int32 size, 
          char *data) {
   
-  InputDocument *doc = (InputDocument*)ALLOC(sizeof(InputDocument));
+  InputDocument *doc = ALLOC(sizeof(InputDocument));
   if (doc == NULL) return NULL;
   
   doc->type = type;
@@ -460,7 +460,7 @@ void internal_free(void *p) {
 static Command*
 init_command(const char *command, DriverContext *context, XslTask *xsl_task, DriverIOVec *iov) {
   Command *cmd; 
-  if ((cmd = (Command*)ALLOC(sizeof(Command))) == NULL) return NULL;  
+  if ((cmd = ALLOC(sizeof(Command))) == NULL) return NULL;  
   if ((cmd->result = init_iov(Text, -1, NULL)) == NULL) {
     return NULL;
   }

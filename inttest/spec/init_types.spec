@@ -47,7 +47,7 @@ static char *internal_command_string = "command123";
   (strncmp(A, E, strlen(E)) == 0)
 
 #define create_test_data(Out, In)    \
-  char *Out = (char*)ALLOC(sizeof(char) * strlen(In));  \
+  char *Out = ALLOC(sizeof(char) * strlen(In));  \
   strcpy(Out, In)
 
 #define setup_size_headers(Hsz, Xml, Xsl)  \
@@ -167,7 +167,7 @@ describe "Initializing XslTask Structures"
 
   it "should fail for NULL PayloadSizeHeaders"
     DriverState state;    
-    XslTask *task = (XslTask*)ALLOC(sizeof(XslTask));
+    XslTask *task = ALLOC(sizeof(XslTask));
     state = init_task(task, NULL, NULL, NULL, NULL);
     state should be BadArgumentError;
     free_task(task);
@@ -176,7 +176,7 @@ describe "Initializing XslTask Structures"
   it "should fail for NULL InputSpecHeaders"
     DriverState state;    
     PayloadSizeHeaders hsize;
-    XslTask *task = (XslTask*)ALLOC(sizeof(XslTask));
+    XslTask *task = ALLOC(sizeof(XslTask));
     state = init_task(task, 
             (const PayloadSizeHeaders* const)&hsize,
             NULL, NULL, NULL);
@@ -188,7 +188,7 @@ describe "Initializing XslTask Structures"
     DriverState state;    
     PayloadSizeHeaders hsize;
     InputSpecHeaders hspec;    
-    XslTask *task = (XslTask*)ALLOC(sizeof(XslTask));
+    XslTask *task = ALLOC(sizeof(XslTask));
     state = init_task(task, 
             (const PayloadSizeHeaders* const)&hsize,
             (const InputSpecHeaders* const)&hspec, 
@@ -201,7 +201,7 @@ describe "Initializing XslTask Structures"
     DriverState state;    
     PayloadSizeHeaders hsize;
     InputSpecHeaders hspec;    
-    XslTask *task = (XslTask*)ALLOC(sizeof(XslTask));
+    XslTask *task = ALLOC(sizeof(XslTask));
     create_test_data(test_xml, input_doc);
         
     state = init_task(task, 
@@ -216,7 +216,7 @@ describe "Initializing XslTask Structures"
     DriverState state;    
     PayloadSizeHeaders hsize;
     InputSpecHeaders hspec;    
-    XslTask *task = (XslTask*)ALLOC(sizeof(XslTask));
+    XslTask *task = ALLOC(sizeof(XslTask));
     create_test_data(test_xml, input_doc);
     create_test_data(test_xsl, xsl_doc);    
 
@@ -234,7 +234,7 @@ describe "Initializing XslTask Structures"
     DriverState state;    
     PayloadSizeHeaders hsize;
     InputSpecHeaders hspec;    
-    XslTask *task = (XslTask*)ALLOC(sizeof(XslTask));
+    XslTask *task = ALLOC(sizeof(XslTask));
     create_test_data(test_xml, input_doc);
     create_test_data(test_xsl, xsl_doc);    
 
@@ -252,7 +252,7 @@ describe "Initializing XslTask Structures"
     DriverState state;    
     PayloadSizeHeaders hsize;
     InputSpecHeaders hspec;    
-    XslTask *task = (XslTask*)ALLOC(sizeof(XslTask));
+    XslTask *task = ALLOC(sizeof(XslTask));
     create_test_data(test_xml, input_doc);
     create_test_data(test_xsl, xsl_doc);    
 
@@ -271,7 +271,7 @@ describe "Initializing XslTask Structures"
     DriverState state;    
     PayloadSizeHeaders hsize;
     InputSpecHeaders hspec;    
-    XslTask *task = (XslTask*)ALLOC(sizeof(XslTask));
+    XslTask *task = ALLOC(sizeof(XslTask));
     create_test_data(test_xml, input_doc);
     create_test_data(test_xsl, xsl_doc);    
 
@@ -294,7 +294,7 @@ describe "Initializing XslTask Structures"
     DriverState state;    
     PayloadSizeHeaders hsize;
     InputSpecHeaders hspec;    
-    XslTask *task = (XslTask*)ALLOC(sizeof(XslTask));
+    XslTask *task = ALLOC(sizeof(XslTask));
     create_test_data(test_xml, input_doc);
     create_test_data(test_xsl, xsl_doc);    
 
@@ -322,7 +322,7 @@ describe "Initializing XslTask Structures"
     setup_size_headers(hsize, test_xml, test_xsl);
     setup_spec_headers(hspec, Buffer, Buffer, 0);
 
-    XslTask *task = (XslTask*)ALLOC(sizeof(XslTask)); 
+    XslTask *task = ALLOC(sizeof(XslTask)); 
     DriverState state; 
     do_with_nomem(
       state = init_task(task, 
@@ -343,7 +343,7 @@ describe "Initializing XslTask Structures"
     setup_size_headers(hsize, test_xml, test_xsl);
     setup_spec_headers(hspec, Buffer, Buffer, 0);
     
-    XslTask *task = (XslTask*)ALLOC(sizeof(XslTask)); 
+    XslTask *task = ALLOC(sizeof(XslTask)); 
     DriverState state = init_task(task, 
       (const PayloadSizeHeaders* const)&hsize, 
       (const InputSpecHeaders* const)&hspec,
@@ -385,9 +385,9 @@ describe "Initializing Command Structures"
 
   it "should assign the XslTask if provided"
     create_test_data(test_data, command_string);    
-    DriverContext *ctx = (DriverContext*)ALLOC(sizeof(DriverContext));
+    DriverContext *ctx = ALLOC(sizeof(DriverContext));
     ctx->port = NULL;
-    XslTask *task = (XslTask*)ALLOC(sizeof(XslTask)); 
+    XslTask *task = ALLOC(sizeof(XslTask)); 
     clear_task_fields(task);
     Command *cmd;
     cmd = init_command(test_data, ctx, task, NULL);
@@ -403,7 +403,7 @@ describe "Initializing Command Structures"
 
   it "should assign the DriverIOVec if provided"
     create_test_data(test_data, internal_command_string);    
-    DriverContext *ctx = (DriverContext*)ALLOC(sizeof(DriverContext));
+    DriverContext *ctx = ALLOC(sizeof(DriverContext));
     ctx->port = NULL;
     DriverIOVec *iov = init_iov(Text, 0, NULL);
     Command *cmd;

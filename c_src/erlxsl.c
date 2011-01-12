@@ -57,7 +57,7 @@ start_driver(ErlDrvPort port, char *buff) {
       return ERL_DRV_ERROR_GENERAL;
   }
 
-  DriverHandle *d = (DriverHandle*)ALLOC(sizeof(DriverHandle));
+  DriverHandle *d = ALLOC(sizeof(DriverHandle));
   if (d == NULL) {
     return ERL_DRV_ERROR_GENERAL; // TODO: use ERL_DRV_ERROR_ERRNO and provide out-of-memory info
   }
@@ -218,7 +218,7 @@ outputv(ErlDrvData drv_data, ErlIOVec *ev) {
   ErlDrvTermData callee_pid = driver_caller(port);
   // assert(ev->binv[1] != NULL)    
   
-  if ((xml = (char*)ALLOC(sizeof(char) * (hsize.input_size + 1))) == NULL) {
+  if ((xml = ALLOC(sizeof(char) * (hsize.input_size + 1))) == NULL) {
     FAIL(port, "system_limit");
     return;
   }
