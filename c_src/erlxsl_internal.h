@@ -209,7 +209,7 @@ static void
 set_dlerror(LoaderSpec *dest, char *message) {
 #ifdef WIN32
   DWORD error_code = GetLastError();
-  strcat(message, " ErrorCode: ~i");
+  strcat(message, " ErrorCode: %i");
   sprintf(dest->error_message, message, (UInt32)error_code);
 #else
   dest->error_message = dlerror();
@@ -234,8 +234,8 @@ load_library(LoaderSpec *dest) {
   if (dest == NULL) return;
   
   if ((dest->library = _dlopen((const char*)dest->name)) == NULL) {
-    DBG("dlopen failed with %s'\n", dlerror());
     set_dlerror(dest, libload_failure);
+    DBG("dlopen failed with %s\n", dest->error_message);
     return;
   }
   

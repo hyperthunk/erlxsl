@@ -39,7 +39,7 @@ static char *good_image_name = "bin/lib_stub.so";
 static char *ok_image_name_bad_format = "priv/test/bin/test_harness";
 
 #define match_have_error(A, E) \
-  (strcmp(A, E) == 0)
+  match_be_equal_to(A, E)
 
 #define BAD_IMAGE_ERROR       \
     "dlopen(priv/test/bin/test_harness, 2): no suitable image found." \
@@ -59,7 +59,7 @@ describe "Loading XslEngine from a Shared Library (so)"
     loader->library should be NULL;
     loader->error_message should have_error "dlopen(no_such_library.so, 2): image not found";
     
-    DRV_FREE(loader);
+    free(loader);
   end
   
   it "should yield error data for images of invalid type/format"
@@ -71,7 +71,7 @@ describe "Loading XslEngine from a Shared Library (so)"
     loader->library should be NULL;
     loader->error_message should have_error BAD_IMAGE_ERROR;
     
-    DRV_FREE(loader);
+    free(loader);
   end
 
   it "should yield error data for images missing the correct entry point"
@@ -83,7 +83,7 @@ describe "Loading XslEngine from a Shared Library (so)"
     loader->library should not be NULL;
     loader->error_message should include "init_engine): symbol not found";
 
-    DRV_FREE(loader);
+    free(loader);
   end
 
   it "should load the correct entry point (when present)"
@@ -96,6 +96,6 @@ describe "Loading XslEngine from a Shared Library (so)"
     loader->init_f = dlsym(loader->library, stub_entry_point);    
     loader->init_f should not be NULL;
 
-    DRV_FREE(loader);
+    free(loader);
   end
 end

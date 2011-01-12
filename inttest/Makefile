@@ -10,6 +10,7 @@ TESTS = $(patsubst %.spec,%.c,$(SPECS))
 ALL_SPECS = spec/all_specs.c
 TESTBIN = bin/all_specs
 TESTLIB = bin/lib_stub.so
+DBG ?= ""
 
 .SUFFIXES: .spec .c
 
@@ -35,7 +36,7 @@ $(TESTLIB):
 
 $(TESTBIN): clean $(BINDIR) $(TESTLIB)
 	@(cat spec/*.spec | deps/cspec/bin/cspec > $(ALL_SPECS))
-	@($(CC) $(LIB) $(ALL_SPECS) $(CFLAGS) $(DRV_CFLAGS) $(DARWIN) -o $(TESTBIN))
+	@($(CC) $(LIB) $(ALL_SPECS) $(CFLAGS) $(DBG) $(DRV_CFLAGS) $(DARWIN) -o $(TESTBIN))
 
 $(BINDIR):
 	mkdir -p $@

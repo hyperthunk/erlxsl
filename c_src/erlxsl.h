@@ -29,7 +29,7 @@
  */
 
 #ifndef _ERLXSL_H
-#define  _ERLXSL_H
+#define _ERLXSL_H
 
 /* pervasive includes */
 #include <stdio.h>
@@ -54,7 +54,7 @@ extern "C" {
 
 /* macro definitions and other hash-defines */
 
-#ifdef DEBUG
+#ifdef LOG_DEBUG
 // writes to stdout if DEBUG is defined
 #define DBG(str, ...) INFO(str, ##__VA_ARGS__);
 #else
@@ -106,30 +106,42 @@ extern "C" {
 /* Assigns the results buffer of the specified command to the supplied buffersize.
    Evaluates to a pointer to the start of the results buffer, or NULL if cmd is a null pointer. */
 #define assign_result_buffer(buffersize, cmd)                                     \
-    ((cmd == NULL)                                                                \
+    ((cmd == NULL || cmd->result == NULL)                                         \
       ? NULL                                                                      \
       : ((cmd->result)->type = Text,                                              \
          (cmd->result)->size = buffersize,                                        \
          (cmd->result->payload.buffer = cmd->alloc(sizeof(char) * buffersize))))
 
 /* Writes the given buffer to the results buffer of the supplied Command. The 
-   contents of the buffer are appended to any existing data held. 
-   Evaluates to the total contents of the current result buffer, or NULL if cmd is a null pointer. */
+   contents of the buffer are appended to any existing data held. */
 #define write_result_buffer(buff, cmd)                                            \
-    ((cmd == NULL || cmd->result == NULL)                                         \
-      ? NULL                                                                      \
-      : (cmd->result->dirty != 0)                                                 \
-        ? strcat(cmd->result->payload.buffer, buff)                               \
-        : (cmd->result->dirty = 1, strcpy(cmd->result->payload.buffer, buff)))
+  do {                                                                            \
+    if (cmd != NULL && cmd->result != NULL) {                                     \
+      if (cmd->result->dirty != 0 && cmd->result->payload.buffer != NULL) {       \
+        strcat(cmd->result->payload.buffer, buff);                                \
+      } else {                                                                    \
+        cmd->result->dirty = 1;                                                   \
+        if (cmd->result->payload.buffer == NULL) {                                \
+          size_t len = strlen(buff);                                              \
+          assign_result_buffer(len, cmd);                                         \
+          strcpy(cmd->result->payload.buffer, buff);                              \
+        } else {                                                                  \
+          strcpy(cmd->result->payload.buffer, buff);                              \
+        }                                                                         \
+      }                                                                           \
+    }                                                                             \
+  } while (false)
 
 /* Clears the results buffer of the supplied Command, unless cmd or cmd->result 
    are null pointers. Evaluates to NULL in any case. */
-#define clear_result_buffer(cmd)                            \
-    ((cmd == NULL || cmd->result == NULL)                   \
-      ? NULL                                                \
-      : (cmd->result->dirty = 0,                            \
-          FREE(cmd->result->payload.buffer),                \
-            cmd->result->payload.buffer = NULL)
+#define clear_result_buffer(cmd)                \
+   do {                                         \
+     if (cmd != NULL && cmd->result != NULL) {  \
+       cmd->result->dirty = 0;                  \
+       DRV_FREE(cmd->result->payload.buffer);   \
+       cmd->result->payload.buffer = NULL;      \
+     }                                          \
+   } while (false)
 
 /* Data Types & Aliasing */
 

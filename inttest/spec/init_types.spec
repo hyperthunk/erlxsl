@@ -46,10 +46,6 @@ static char *internal_command_string = "command123";
 #define match_have_failed_due_to(A, E) \
   (strncmp(A, E, strlen(E)) == 0)
 
-#define create_test_data(Out, In)    \
-  char *Out = ALLOC(sizeof(char) * strlen(In));  \
-  strcpy(Out, In)
-
 #define setup_size_headers(Hsz, Xml, Xsl)  \
   Hsz.input_size = strlen(Xml); \
   Hsz.xsl_size = strlen(Xsl)
@@ -396,6 +392,7 @@ describe "Initializing Command Structures"
     
     ptask should point_to task;
     cmd->command_string should equal test_data;
+    cmd->context should point_to ctx;    
     
     free_command(cmd);
     DRV_FREE(ctx);
@@ -413,6 +410,7 @@ describe "Initializing Command Structures"
     DriverIOVec *piov = cmd->command_data.iov;
 
     cmd->command_string should equal test_data;
+    cmd->context should point_to ctx;
     piov should point_to iov;
     
     free_command(cmd);

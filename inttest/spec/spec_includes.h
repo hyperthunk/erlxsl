@@ -58,6 +58,13 @@ void *_spec_alloc(size_t size) {
   allow_allocation_sizes = size; stmt; \
   allow_allocation_sizes = -1;
 
+#define create_test_data(Out, In)    \
+  char *Out = ALLOC(sizeof(char) * strlen(In));  \
+  strcpy(Out, In)
+
+#define match_be_equal_to(A, E) \
+  (strncmp(A, E, strlen(E)) == 0)
+
 // override 'assert' behaviour
 
 #define _TEST_ASSERT true
