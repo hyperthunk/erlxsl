@@ -447,21 +447,26 @@ init_task(XslTask *task,
   return Success;
 };
 
-static inline void* 
+static void* 
 internal_alloc(size_t size) {
   return ALLOC(size);
 };
 
-static inline 
-void internal_free(void *p) {
+static void 
+internal_free(void *p) {
   DRV_FREE(p);
+};
+
+static void* 
+internal_realloc(void *ptr, size_t size) {
+  return REALLOC(ptr, size);
 };
 
 static Command*
 init_command(const char *command, DriverContext *context, XslTask *xsl_task, DriverIOVec *iov) {
   Command *cmd; 
   if ((cmd = ALLOC(sizeof(Command))) == NULL) return NULL;  
-  if ((cmd->result = init_iov(Text, -1, NULL)) == NULL) {
+  if ((cmd->result = init_iov(Text, 0, NULL)) == NULL) {
     return NULL;
   }
   if (xsl_task != NULL) {
@@ -473,6 +478,7 @@ init_command(const char *command, DriverContext *context, XslTask *xsl_task, Dri
   cmd->context = context;
   cmd->alloc = internal_alloc;
   cmd->release = internal_free;
+  cmd->resize = internal_realloc;
   return cmd;
 };
 

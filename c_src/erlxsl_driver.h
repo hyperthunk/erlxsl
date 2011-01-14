@@ -36,8 +36,6 @@
 #include <erl_driver.h>
 #include <ei.h>
 
-#include "erlxsl.h"
-
 /* INTERNAL DATA & DATA STRUCTURES */
 
 static ErlDrvTermData atom_result; 
@@ -47,6 +45,8 @@ static ErlDrvTermData atom_error;
 
 // driver_alloc wrapper
 #define ALLOC(size) driver_alloc(size)
+
+#define REALLOC(ptr, size) driver_realloc(ptr, size)
 
 // magics for command identification
 #define INIT_COMMAND (UInt32)9
@@ -65,6 +65,9 @@ static ErlDrvTermData* make_driver_term_bin(ErlDrvPort*, ErlDrvBinary*, ErlDrvTe
 
 /* makes a tagged tuple (using the driver term format) for the supplied buffer payload. */
 static ErlDrvTermData* make_driver_term(ErlDrvPort*, char*, ErlDrvTermData*, long*);
+
+/* grab the API functions... */
+#include "erlxsl.h"
 
 /* we want all the internal utility functions and any additional includes now. */
 #include "erlxsl_internal.h"

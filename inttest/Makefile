@@ -2,7 +2,7 @@
 CC ?= gcc
 LEG ?= leg
 DARWIN = $(shell uname | awk '/Darwin/ { print "-D_DARWIN" }')
-CFLAGS = -std=c99 -fPIC -I ../c_src -I deps/cspec/src -Werror
+CFLAGS = -std=c99 -fPIC -I ../c_src -I deps/cspec/src -Werror -fnested-functions
 LIB = deps/cspec/build/cspec.o
 BINDIR = bin
 SPECS = $(shell find spec -name so_*.spec)

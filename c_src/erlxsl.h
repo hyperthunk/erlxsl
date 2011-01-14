@@ -103,33 +103,40 @@ extern "C" {
         ? iov->payload.buffer       \
         : NULL))
 
-/* Assigns the results buffer of the specified command to the supplied buffersize.
-   Evaluates to a pointer to the start of the results buffer, or NULL if cmd is a null pointer. */
-#define assign_result_buffer(buffersize, cmd)                                     \
-    ((cmd == NULL || cmd->result == NULL)                                         \
-      ? NULL                                                                      \
-      : ((cmd->result)->type = Text,                                              \
-         (cmd->result)->size = buffersize,                                        \
-         (cmd->result->payload.buffer = cmd->alloc(sizeof(char) * buffersize))))
+/*  Writes the given buffer to the results buffer of the supplied Command. 
+   
+   - If the buffer is not yet assigned, assigns strlen(buff) on the heap and copies buff to the result DriverIOVec.
+   - If the buffer is marked as assigned (i.e., dirty=1) but contains no data (i.e., is NULL), 
+     assigns strlen(buff) on the heap and copies buff to the result DriverIOVec.
+   - If the buffer is marked as assigned and is not NULL, buff is concatenated with the result buffer.
+   - If the size of and existing (and assigned) buffer is too small, or the buffer is unassigned, ensures the 
+     correct amount of heap space is available before copying.
+   
+   Evaluates to the total contents of the current result buffer, or NULL if 
+   cmd or cmd->result is a null pointer. */
 
-/* Writes the given buffer to the results buffer of the supplied Command. The 
-   contents of the buffer are appended to any existing data held. */
-#define write_result_buffer(buff, cmd)                                            \
-  do {                                                                            \
-    if (cmd != NULL && cmd->result != NULL) {                                     \
-      if (cmd->result->dirty != 0 && cmd->result->payload.buffer != NULL) {       \
-        strcat(cmd->result->payload.buffer, buff);                                \
-      } else {                                                                    \
-        cmd->result->dirty = 1;                                                   \
-        if (cmd->result->payload.buffer == NULL) {                                \
-          size_t len = strlen(buff);                                              \
-          assign_result_buffer(len, cmd);                                         \
-          strcpy(cmd->result->payload.buffer, buff);                              \
-        } else {                                                                  \
-          strcpy(cmd->result->payload.buffer, buff);                              \
-        }                                                                         \
-      }                                                                           \
-    }                                                                             \
+#define resize_result_buffer(newsize, cmd) \
+  (cmd->result->payload.buffer = \
+    cmd->resize(cmd->result->payload.buffer, cmd->result->size = (Int32)newsize))
+
+#define cmd_buff(cmd) cmd->result->payload.buffer
+
+#define ensure_buffer(buff, cmd)  \
+  ((cmd == NULL || buff == NULL) \
+    ? NULL /* we cannot proceed */ \
+    : (cmd->result->dirty == 0) \
+      ? ((cmd->result->size - strlen(cmd->result->payload.buffer)) >= strlen(buff)) \
+        ? resize_result_buffer(strlen(buff) + cmd->result->size, cmd) \
+        : NULL \
+      : NULL)
+
+#define ensure_buffer_x(buff, cmd)                \
+  do {                                          \
+    if (cmd->result->size == 0) {               \
+      make_result_buffer(strlen(buff), cmd);    \
+    } else {                                    \
+      resize_result_buffer(strlen(buff) + cmd->result->size, cmd)); \
+    }                                           \
   } while (false)
 
 /* Clears the results buffer of the supplied Command, unless cmd or cmd->result 
@@ -142,6 +149,50 @@ extern "C" {
        cmd->result->payload.buffer = NULL;      \
      }                                          \
    } while (false)
+
+#define make_result_buffer(buffersize, cmd) \
+  ((cmd == NULL || buffersize <= 0) ? NULL \
+    : (cmd->result == NULL) ? NULL \
+      : (cmd->result->type = Text, \
+         cmd->result->size = buffersize, \
+         cmd->result->payload.buffer = cmd->alloc(sizeof(char) * buffersize)))
+
+/*  Writes the given buffer to the results buffer of the supplied Command. 
+   
+   - If the buffer is not yet assigned, assigns strlen(buff) on the heap and copies buff to the result DriverIOVec.
+   - If the buffer is marked as assigned (i.e., dirty=1) but contains no data (i.e., is NULL), 
+     assigns strlen(buff) on the heap and copies buff to the result DriverIOVec.
+   - If the buffer is marked as assigned and is not NULL, buff is concatenated with the result buffer.
+   - If the size of and existing (and assigned) buffer is too small, or the buffer is unassigned, ensures the 
+     correct amount of heap space is available before copying.
+   
+   Evaluates to the total contents of the current result buffer, or NULL if 
+   cmd or cmd->result is a null pointer. */
+#define write_result_buffer(buff, cmd)                        \
+  do {                                                        \
+    if (cmd != NULL) {                                        \
+      if (cmd->result != NULL) {                              \
+        if (cmd->result->dirty != 0) {                        \
+          if (cmd->result->payload.buffer != NULL) {          \
+            ensure_buffer(buff, cmd);                         \
+            strcat(cmd->result->payload.buffer, buff);        \
+          } else {                                            \
+            write_new_result_buffer(buff, cmd);               \
+          }                                                   \
+        } else {                                              \
+          write_new_result_buffer(buff, cmd);                 \
+        }                                                     \
+      }                                                       \
+    }                                                         \
+  } while (false)
+
+/* Used *INTERNALLY* to write to a new (unassigned) result buffer - DO NOT USE THIS DIRECTLY */ 
+#define write_new_result_buffer(buff, cmd)        \
+  do {                                            \
+    if (make_result_buffer(strlen(buff), cmd)) {  \
+      strcpy(cmd->result->payload.buffer, buff);  \
+    }                                             \
+  } while (false)
 
 /* Data Types & Aliasing */
 
@@ -265,6 +316,9 @@ typedef struct {
 /* Allocation function type. */  
 typedef void* alloc_f(size_t size);
 
+/* Reallocation function type */
+typedef void * realloc_f(void *ptr, size_t size);
+
 /* Release/Free function type. */
 typedef void release_f(void* p);
 
@@ -283,9 +337,11 @@ typedef struct {
   DriverIOVec* result;
   /* The internal (driver) call context (i.e., port and calling process id). */    
   DriverContext* context;
-  /* Custom allocator (wraps erl_driver's driver_alloc) */
+  /* Custom allocator (wraps drivers allocation strategy) */
   alloc_f* alloc;
-  /* Custom 'free' (wraps erl_driver's driver_free) */
+  /* Custom realloc (wraps drivers allocation strategy) */
+  realloc_f* resize;
+  /* Custom 'free' (wraps drivers allocation strategy) */
   release_f* release;
 } Command;
 

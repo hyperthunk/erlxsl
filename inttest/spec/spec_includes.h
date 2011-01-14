@@ -85,8 +85,6 @@ void _spec_free(void *x) {
   do { DBG("Free " #x " [%p]", x); \
     _spec_free(x); } while (false)
 
-#include "erlxsl.h"
 #include "erlxsl_port.h"
-#include "erlxsl_internal.h"
 
 #endif /* _SPEC_INCL_H */

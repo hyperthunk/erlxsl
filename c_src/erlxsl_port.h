@@ -33,11 +33,13 @@
 #ifndef _ERLXSL_PRT_H
 #define  _ERLXSL_PRT_H
 
-#include "erlxsl.h"
-
 // driver_alloc wrapper
 #ifndef ALLOC
 #define ALLOC(size) malloc(size)
+#endif
+
+#ifndef REALLOC
+#define REALLOC(ptr, size) realloc(ptr, size)
 #endif
 
 // magics for command identification
@@ -54,5 +56,9 @@
 #define FAIL(p, msg)  \
  ERROR(msg);          \
  exit(1);
+
+#include "erlxsl.h"
+/* we want all the internal utility functions and any additional includes now. */
+#include "erlxsl_internal.h"
 
 #endif /* _ERLXSL_PRT_H */

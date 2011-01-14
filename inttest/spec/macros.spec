@@ -33,6 +33,8 @@
 static char *output_data = "format %s\n";
 static char *command_string_transform = "transform";
 static char *command_foo = "command_foo";
+static char *assigned_data = "data";
+static char *combined_data = "datadata";
 
 describe "ALLOC macro expansion"
 
@@ -92,13 +94,40 @@ describe "Obtaining a char buffer from a DriverIOVec using the get_buffer macro"
   
 end
 
-describe "Assigning a result buffer to a Command using the assign_result_buffer macro"
-  
-  it "should evaluate to NULL when the Command reference is NULL"
+
+describe "Assigning a result buffer to a Command using the supplied macro"
+
+  it "should evaluate to NULL when the DriverIOVec argument to make_result_buffer is NULL"
     Command *cmd = NULL;
-    assign_result_buffer(0, cmd) should be NULL;
+    make_result_buffer(255, cmd) should be NULL;
   end
   
+  it "should evaluate to NULL when the Command argument to ensure_buffer is NULL"
+    Command *cmd = NULL;
+    ensure_buffer(command_string_transform, cmd) should be NULL;
+  end
+  
+  it "should evaluate to NULL when the buffer argument to ensure_buffer is NULL"
+    Command *cmd = init_command(command_foo, NULL, NULL, NULL);
+    ensure_buffer(NULL, cmd) should be NULL;
+    free_command(cmd);
+  end
+  
+  it "should succeed when the Command's result already contains space for the supplied buffer"
+    Command *cmd = init_command(command_foo, NULL, NULL, NULL);
+    make_result_buffer(255, cmd);
+    
+    // sanity checking...
+    DriverIOVec *iov = cmd->result;
+    iov->dirty should be 0;
+    iov->size should be 255;
+    
+    create_test_data(test_command, command_string_transform);
+    ensure_buffer(test_command, cmd) should point_to cmd->result->payload.buffer;
+    
+    strlen(cmd->result->payload.buffer) should equal 0;
+  end 
+
   it "should evaluate to NULL when the Command result DriverIOVec has not been properly assigned"
     create_test_data(test_command, command_string_transform);
     Command *cmd = init_command(test_command, NULL, NULL, NULL);
@@ -107,7 +136,7 @@ describe "Assigning a result buffer to a Command using the assign_result_buffer 
     free_iov(cmd->result);
     cmd->result = NULL;
 
-    assign_result_buffer(0, cmd) should be NULL;
+    make_result_buffer(0, cmd) should be NULL;
     free_command(cmd);
   end
   
@@ -115,11 +144,13 @@ describe "Assigning a result buffer to a Command using the assign_result_buffer 
     create_test_data(test_command, command_string_transform);
     create_test_data(test_data, command_string_transform);
     Command *cmd = init_command(test_command, NULL, NULL, NULL);
+    int len = strlen(test_data);
     
-    assign_result_buffer(strlen(test_data), cmd);
+    make_result_buffer(len, cmd) should not be NULL;
     DriverIOVec *iov = cmd->result;
     
     iov should not be NULL;
+    iov->dirty should equal 0;  // we haven't written to it yet!
     iov->type should equal Text;
     iov->size should equal strlen(test_data);
     
@@ -127,37 +158,4 @@ describe "Assigning a result buffer to a Command using the assign_result_buffer 
   end
   
 end
-
-describe "Writing output to a Command result buffer (i.e., DriverIOVec) using the write_result_buffer macro"
-
-  it "should assign the requisite space and copy the supplied buffer when the payload.buffer is unassigned"
-    create_test_data(test_command, command_foo);
-    Command *cmd = init_command(test_command,
-                                NULL, NULL,
-                                init_iov(Text, strlen(test_command), test_command));
-
-    DriverIOVec *result = cmd->result;
-    
-    // should set the actual payload.buffer to NULL
-    clear_result_buffer(cmd);
-
-    // a bit of a sanity check is needed here
-    result->dirty should equal 0;
-    char *result_buff = result->payload.buffer;
-    result_buff should be NULL;
-    
-    write_result_buffer(test_command, cmd);
-    
-    // the DriverIOVec result is still properly assigned
-    result->size should equal strlen(test_command);
-    result->dirty should equal 1;
-    
-    // both allocation and copying should have succeeded - we find out now
-    result_buff = result->payload.buffer;
-    
-    result_buff should be_equal_to test_command;
-    
-    free_command(cmd);
-  end
-
-end
+  

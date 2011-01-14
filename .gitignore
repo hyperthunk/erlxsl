@@ -22,3 +22,4 @@ ebin/erlxsl_sup.erl
 .komodotools
 MyProject.komodoproject
 inttest/spec/all_specs.c
+c_src/cscope.outcscope.out
