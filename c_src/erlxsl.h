@@ -125,19 +125,15 @@ extern "C" {
   ((cmd == NULL || buff == NULL) \
     ? NULL /* we cannot proceed */ \
     : (cmd->result->dirty == 0) \
-      ? ((cmd->result->size - strlen(cmd->result->payload.buffer)) >= strlen(buff)) \
-        ? resize_result_buffer(strlen(buff) + cmd->result->size, cmd) \
-        : NULL \
-      : NULL)
-
-#define ensure_buffer_x(buff, cmd)                \
-  do {                                          \
-    if (cmd->result->size == 0) {               \
-      make_result_buffer(strlen(buff), cmd);    \
-    } else {                                    \
-      resize_result_buffer(strlen(buff) + cmd->result->size, cmd)); \
-    }                                           \
-  } while (false)
+      ? (cmd->result->size < strlen(buff)) \
+        ? resize_result_buffer(strlen(buff), cmd) \
+          /* we've enough room to work here */ \
+        : (cmd->result->payload.buffer == NULL) \
+          ? make_result_buffer(strlen(buff), cmd) \
+          : cmd->result->payload.buffer \
+      : (cmd->result->size < (strlen(cmd->result->payload.buffer) + strlen(buff))) \
+        ? resize_result_buffer(strlen(buff) + strlen(cmd->result->payload.buffer), cmd) \
+        : cmd->result->payload.buffer)
 
 /* Clears the results buffer of the supplied Command, unless cmd or cmd->result 
    are null pointers. Evaluates to NULL in any case. */
@@ -157,7 +153,7 @@ extern "C" {
          cmd->result->size = buffersize, \
          cmd->result->payload.buffer = cmd->alloc(sizeof(char) * buffersize)))
 
-/*  Writes the given buffer to the results buffer of the supplied Command. 
+/*  Writes the given buffer to the results buffer of the supplied Command
    
    - If the buffer is not yet assigned, assigns strlen(buff) on the heap and copies buff to the result DriverIOVec.
    - If the buffer is marked as assigned (i.e., dirty=1) but contains no data (i.e., is NULL), 
@@ -168,7 +164,14 @@ extern "C" {
    
    Evaluates to the total contents of the current result buffer, or NULL if 
    cmd or cmd->result is a null pointer. */
-#define write_result_buffer(buff, cmd)                        \
+#define write_result_buffer(buff, cmd) \
+  ((ensure_buffer(buff, cmd)) \
+    ? (cmd->result->dirty == 0) \
+      ? (cmd->result->dirty=1, strcpy(cmd->result->payload.buffer, buff))  \
+      : strcat(cmd->result->payload.buffer, buff)  \
+    : NULL)
+
+#define write_result_buffer_x(buff, cmd)                        \
   do {                                                        \
     if (cmd != NULL) {                                        \
       if (cmd->result != NULL) {                              \

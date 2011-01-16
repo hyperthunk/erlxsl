@@ -140,7 +140,7 @@ describe "Assigning a result buffer to a Command using the supplied macro"
     free_command(cmd);
   end
   
-  it "should assign a buffer of the requested size"
+  it "should assign a buffer of the requested size when the result is clean"
     create_test_data(test_command, command_string_transform);
     create_test_data(test_data, command_string_transform);
     Command *cmd = init_command(test_command, NULL, NULL, NULL);
@@ -150,11 +150,85 @@ describe "Assigning a result buffer to a Command using the supplied macro"
     DriverIOVec *iov = cmd->result;
     
     iov should not be NULL;
-    iov->dirty should equal 0;  // we haven't written to it yet!
+    iov->dirty should equal 0;  
     iov->type should equal Text;
     iov->size should equal strlen(test_data);
     
     free_command(cmd);
+  end
+
+  it "should ensure that a buffer is allocated when it is initially NULL"
+    create_test_data(test_command, command_string_transform);
+    create_test_data(test_data, command_string_transform);
+    Command *cmd = init_command(test_command, NULL, NULL, NULL);
+    int len = strlen(test_data);
+    
+    ensure_buffer(test_data, cmd) should not be NULL;
+    DriverIOVec *iov = cmd->result;
+    
+    iov should not be NULL;
+    iov->dirty should equal 0;  
+    iov->type should equal Text;
+    iov->size should equal strlen(test_data);
+    
+    free_command(cmd);
+  end
+
+  it "should resize the underlying buffer when necessary"
+    create_test_data(test_command, command_string_transform);
+    create_test_data(test_data, assigned_data);
+    Command *cmd = init_command(test_command, NULL, NULL, NULL);
+    int len = strlen(test_data);
+
+    make_result_buffer(len, cmd) should not be NULL;
+    DriverIOVec *iov = cmd->result;
+
+    iov->size should equal len;
+    ensure_buffer(combined_data, cmd);
+    int calc = iov->size - strlen(iov->payload.buffer);
+    iov->size should equal strlen(combined_data);
+  end
+ 
+  it "should append space to an existing buffer when required"
+    create_test_data(test_command, command_string_transform);
+    create_test_data(test_data, assigned_data);
+    Command *cmd = init_command(test_command, NULL, NULL, NULL);
+    
+    write_result_buffer(test_data, cmd) should not be NULL;
+
+    DriverIOVec *iov = cmd->result;
+    iov should not be NULL;
+    iov->size should equal strlen(test_data);
+
+    Int32 calc = (cmd->result->size - strlen(cmd->result->payload.buffer));
+
+    ensure_buffer(test_data, cmd) should not be NULL;
+    iov->size should equal strlen(combined_data);
+    // quick sanity check that should show we have not written any additional data
+    char *buff = iov->payload.buffer;
+
+    buff should be_equal_to test_data;
+  end
+
+  it "should append data to an existing buffer when it is already dirty"
+    create_test_data(test_command, command_string_transform);
+    create_test_data(test_data, assigned_data);
+    Command *cmd = init_command(test_command, NULL, NULL, NULL);
+    
+    write_result_buffer(test_data, cmd) should not be NULL;
+
+    DriverIOVec *iov = cmd->result;
+    iov should not be NULL;
+    iov->size should equal strlen(test_data);
+    iov->dirty should be 1;
+
+    write_result_buffer(test_data, cmd) should not be NULL;
+    size_t len = (size_t)iov->size;
+    len should equal strlen(combined_data);
+    // quick sanity check that should show we have not written any additional data
+    char *buff = iov->payload.buffer;
+
+    buff should be_equal_to combined_data;
   end
   
 end
