@@ -121,6 +121,9 @@ extern "C" {
 
 #define cmd_buff(cmd) cmd->result->payload.buffer
 
+/* Ensures the result DriverIOVec for cmd is sufficient to contain buff without destroying any existing data. 
+   Evaluates to the total contents of the current result buffer, or NULL if 
+   cmd or cmd->result is a null pointer. */
 #define ensure_buffer(buff, cmd)  \
   ((cmd == NULL || buff == NULL) \
     ? NULL /* we cannot proceed */ \
@@ -146,6 +149,8 @@ extern "C" {
      }                                          \
    } while (false)
 
+/* allocates a result buffer of the requested size, setting the 
+ * type and size fields of the DriverIOVec structure accordingly */
 #define make_result_buffer(buffersize, cmd) \
   ((cmd == NULL || buffersize <= 0) ? NULL \
     : (cmd->result == NULL) ? NULL \
@@ -155,12 +160,9 @@ extern "C" {
 
 /*  Writes the given buffer to the results buffer of the supplied Command
    
-   - If the buffer is not yet assigned, assigns strlen(buff) on the heap and copies buff to the result DriverIOVec.
-   - If the buffer is marked as assigned (i.e., dirty=1) but contains no data (i.e., is NULL), 
-     assigns strlen(buff) on the heap and copies buff to the result DriverIOVec.
-   - If the buffer is marked as assigned and is not NULL, buff is concatenated with the result buffer.
-   - If the size of and existing (and assigned) buffer is too small, or the buffer is unassigned, ensures the 
-     correct amount of heap space is available before copying.
+   - Ensures that the buffer is of sufficient size
+   - If the buffer has already been written to, then buff is concatenated onto the end
+   - If the buffer has not been written to, buff is copied into place
    
    Evaluates to the total contents of the current result buffer, or NULL if 
    cmd or cmd->result is a null pointer. */
@@ -170,32 +172,6 @@ extern "C" {
       ? (cmd->result->dirty=1, strcpy(cmd->result->payload.buffer, buff))  \
       : strcat(cmd->result->payload.buffer, buff)  \
     : NULL)
-
-#define write_result_buffer_x(buff, cmd)                        \
-  do {                                                        \
-    if (cmd != NULL) {                                        \
-      if (cmd->result != NULL) {                              \
-        if (cmd->result->dirty != 0) {                        \
-          if (cmd->result->payload.buffer != NULL) {          \
-            ensure_buffer(buff, cmd);                         \
-            strcat(cmd->result->payload.buffer, buff);        \
-          } else {                                            \
-            write_new_result_buffer(buff, cmd);               \
-          }                                                   \
-        } else {                                              \
-          write_new_result_buffer(buff, cmd);                 \
-        }                                                     \
-      }                                                       \
-    }                                                         \
-  } while (false)
-
-/* Used *INTERNALLY* to write to a new (unassigned) result buffer - DO NOT USE THIS DIRECTLY */ 
-#define write_new_result_buffer(buff, cmd)        \
-  do {                                            \
-    if (make_result_buffer(strlen(buff), cmd)) {  \
-      strcpy(cmd->result->payload.buffer, buff);  \
-    }                                             \
-  } while (false)
 
 /* Data Types & Aliasing */
 

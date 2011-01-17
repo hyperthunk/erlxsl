@@ -59,7 +59,7 @@ default_handleTransform(Command *command) {
 
   Int32 buffersize = (get_doc_size(task->input_doc) + get_doc_size(task->xslt_doc) + 1); 
   DBG("Assigning result buffer of %i\n", buffersize);  
-  if (!assign_result_buffer(buffersize, command)) {
+  if (!make_result_buffer(buffersize, command)) {
     return OutOfMemoryError;
   }
   

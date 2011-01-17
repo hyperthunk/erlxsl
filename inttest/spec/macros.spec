@@ -163,10 +163,16 @@ describe "Assigning a result buffer to a Command using the supplied macro"
     Command *cmd = init_command(test_command, NULL, NULL, NULL);
     int len = strlen(test_data);
     
-    ensure_buffer(test_data, cmd) should not be NULL;
     DriverIOVec *iov = cmd->result;
+    char *buff = iov->payload.buffer;
+    buff should be NULL;
+
+    ensure_buffer(test_data, cmd) should not be NULL;
     
     iov should not be NULL;
+    buff = iov->payload.buffer;
+    buff should not be NULL;
+
     iov->dirty should equal 0;  
     iov->type should equal Text;
     iov->size should equal strlen(test_data);
@@ -185,8 +191,8 @@ describe "Assigning a result buffer to a Command using the supplied macro"
 
     iov->size should equal len;
     ensure_buffer(combined_data, cmd);
-    int calc = iov->size - strlen(iov->payload.buffer);
     iov->size should equal strlen(combined_data);
+    free_command(cmd);
   end
  
   it "should append space to an existing buffer when required"
@@ -200,16 +206,33 @@ describe "Assigning a result buffer to a Command using the supplied macro"
     iov should not be NULL;
     iov->size should equal strlen(test_data);
 
-    Int32 calc = (cmd->result->size - strlen(cmd->result->payload.buffer));
-
     ensure_buffer(test_data, cmd) should not be NULL;
+
     iov->size should equal strlen(combined_data);
     // quick sanity check that should show we have not written any additional data
     char *buff = iov->payload.buffer;
 
     buff should be_equal_to test_data;
+    free_command(cmd);
   end
 
+  it "should not append space when sufficient buffer space is already allocated"
+    create_test_data(test_command, command_string_transform);
+    create_test_data(test_data, assigned_data);
+    Command *cmd = init_command(test_command, NULL, NULL, NULL);
+    
+    make_result_buffer(255, cmd) should not be NULL;
+    write_result_buffer(test_data, cmd) should not be NULL;
+
+    DriverIOVec *iov = cmd->result;
+    iov->size should equal 255;
+
+    write_result_buffer(test_data, cmd) should not be NULL;
+
+    iov->size should equal 255;
+    free_command(cmd);
+  end
+  
   it "should append data to an existing buffer when it is already dirty"
     create_test_data(test_command, command_string_transform);
     create_test_data(test_data, assigned_data);
