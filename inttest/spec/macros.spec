@@ -94,7 +94,6 @@ describe "Obtaining a char buffer from a DriverIOVec using the get_buffer macro"
   
 end
 
-
 describe "Assigning a result buffer to a Command using the supplied macro"
 
   it "should evaluate to NULL when the DriverIOVec argument to make_result_buffer is NULL"
@@ -113,7 +112,7 @@ describe "Assigning a result buffer to a Command using the supplied macro"
     free_command(cmd);
   end
   
-  it "should succeed when the Command's result already contains space for the supplied buffer"
+  it "should allocate and size the DriverIOVec only when making an initial result buffer"
     Command *cmd = init_command(command_foo, NULL, NULL, NULL);
     make_result_buffer(255, cmd);
     
@@ -121,17 +120,24 @@ describe "Assigning a result buffer to a Command using the supplied macro"
     DriverIOVec *iov = cmd->result;
     iov->dirty should be 0;
     iov->size should be 255;
+    strlen(cmd->result->payload.buffer) should equal 0;
+    free_command(cmd);
+  end 
+
+  it "should succeed when the Command's result already contains space for the supplied buffer"
+    Command *cmd = init_command(command_foo, NULL, NULL, NULL);
+    make_result_buffer(255, cmd);
     
     create_test_data(test_command, command_string_transform);
     ensure_buffer(test_command, cmd) should point_to cmd->result->payload.buffer;
     
     strlen(cmd->result->payload.buffer) should equal 0;
+    free_command(cmd);
   end 
 
   it "should evaluate to NULL when the Command result DriverIOVec has not been properly assigned"
     create_test_data(test_command, command_string_transform);
     Command *cmd = init_command(test_command, NULL, NULL, NULL);
-    cmd->result should not be NULL;
     // this is an edge case.....
     free_iov(cmd->result);
     cmd->result = NULL;
@@ -163,16 +169,9 @@ describe "Assigning a result buffer to a Command using the supplied macro"
     Command *cmd = init_command(test_command, NULL, NULL, NULL);
     int len = strlen(test_data);
     
-    DriverIOVec *iov = cmd->result;
-    char *buff = iov->payload.buffer;
-    buff should be NULL;
-
     ensure_buffer(test_data, cmd) should not be NULL;
-    
-    iov should not be NULL;
-    buff = iov->payload.buffer;
-    buff should not be NULL;
 
+    DriverIOVec *iov = cmd->result;
     iov->dirty should equal 0;  
     iov->type should equal Text;
     iov->size should equal strlen(test_data);
@@ -188,10 +187,11 @@ describe "Assigning a result buffer to a Command using the supplied macro"
 
     make_result_buffer(len, cmd) should not be NULL;
     DriverIOVec *iov = cmd->result;
-
     iov->size should equal len;
+
     ensure_buffer(combined_data, cmd);
     iov->size should equal strlen(combined_data);
+
     free_command(cmd);
   end
  
@@ -203,16 +203,16 @@ describe "Assigning a result buffer to a Command using the supplied macro"
     write_result_buffer(test_data, cmd) should not be NULL;
 
     DriverIOVec *iov = cmd->result;
-    iov should not be NULL;
     iov->size should equal strlen(test_data);
 
     ensure_buffer(test_data, cmd) should not be NULL;
 
     iov->size should equal strlen(combined_data);
+
     // quick sanity check that should show we have not written any additional data
     char *buff = iov->payload.buffer;
-
     buff should be_equal_to test_data;
+    
     free_command(cmd);
   end
 
