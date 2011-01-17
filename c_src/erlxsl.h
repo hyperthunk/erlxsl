@@ -103,18 +103,6 @@ extern "C" {
         ? iov->payload.buffer       \
         : NULL))
 
-/*  Writes the given buffer to the results buffer of the supplied Command. 
-   
-   - If the buffer is not yet assigned, assigns strlen(buff) on the heap and copies buff to the result DriverIOVec.
-   - If the buffer is marked as assigned (i.e., dirty=1) but contains no data (i.e., is NULL), 
-     assigns strlen(buff) on the heap and copies buff to the result DriverIOVec.
-   - If the buffer is marked as assigned and is not NULL, buff is concatenated with the result buffer.
-   - If the size of and existing (and assigned) buffer is too small, or the buffer is unassigned, ensures the 
-     correct amount of heap space is available before copying.
-   
-   Evaluates to the total contents of the current result buffer, or NULL if 
-   cmd or cmd->result is a null pointer. */
-
 #define resize_result_buffer(newsize, cmd) \
   (cmd->result->payload.buffer = \
     cmd->resize(cmd->result->payload.buffer, cmd->result->size = (Int32)newsize))
