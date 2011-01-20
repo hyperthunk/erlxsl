@@ -30,7 +30,6 @@
 
 #include "erlxsl.h"
 #include "erlxsl_port.h"
-#include "erlxsl_ei.h"
 #include <stdio.h>
 
 int main(void) {

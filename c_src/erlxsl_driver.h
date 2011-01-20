@@ -40,6 +40,7 @@
 
 static ErlDrvTermData atom_result; 
 static ErlDrvTermData atom_error;
+static ErlDrvTermData atom_log;
 
 /* LINKED-IN DRIVER SPECIFIC MACROS - MUST BE SPECIFIED BEFORE INCLUDING INTERNAL FUNCTIONS/TYPES */
 
@@ -73,6 +74,60 @@ static ErlDrvTermData* make_driver_term(ErlDrvPort*, char*, ErlDrvTermData*, lon
 #include "erlxsl_internal.h"
 
 /* INTERNAL UTILITY FUNCTIONS */
+
+/*
+static void
+driver_log(DriverHandle *drv, ErlDrvTermData *level, const char *const message) {
+  DrvTaggedData output;
+  output->tag = level;
+  output->data = message;
+  DriverIOVec* outv = init_iov(Object, sizeof(DrvTaggedData), &output);
+}
+
+static ErlDrvTermData*
+create_driver_output(DriverHandle *drv, ErlDrvTermData *tag, DriverIOVec *outv, long *response_len) {
+  ErlDrvTermData *term;
+  ErlDrvPort port = (ErlDrvPort)drv->port;
+
+  switch (outv->type) {
+  case Text:
+    term = make_driver_term(&port, outv->payload.buffer, tag, response_len);
+    break;
+  case Binary:
+    term = make_driver_term_bin(&port, ((ErlDrvBinary*)outv->payload.data), tag, response_len);
+    break;
+  case Object:
+    term = make_two_tag_tuple(&port, (DrvTaggedData*)outv->payload.data, tag, response_len);
+    break;
+  default:
+    term = NULL;
+  }
+  
+  return term;
+};
+
+static ErlDrvTermData*
+make_two_tag_tuple(ErlDrvPort *port, DrvTaggedData *payload, ErlDrvTermData *tag, long *response_len) {
+  ErlDrvTermData *term;
+  ErlDrvTermData  spec[9];
+  term = ALLOC(sizeof(spec));
+  if (term == NULL) return NULL;
+  
+  spec[0] = ERL_DRV_ATOM;
+  spec[1] = *tag;
+  spec[2] = ERL_DRV_ATOM;
+  spec[3] = payload->tag;
+  spec[4] = ERL_DRV_BUF2BINARY;
+  spec[5] = payload->data;
+  spec[6] = strlen(payload->data);
+  spec[7] = ERL_DRV_TUPLE; 
+  spec[8] = 3;
+  
+  memcpy(term, &spec, sizeof(spec));
+  *length = sizeof(spec) / sizeof(spec[0]);
+  return term;
+};
+*/
 
 static ErlDrvTermData* 
 make_driver_term_bin(ErlDrvPort *port, ErlDrvBinary *payload, ErlDrvTermData *tag, long *length) {
@@ -127,3 +182,4 @@ make_driver_term(ErlDrvPort *port, char *payload, ErlDrvTermData *tag, long *len
 };
 
 #endif  /* _ERLXSL_DRV_H */
+

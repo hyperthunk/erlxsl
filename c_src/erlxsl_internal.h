@@ -44,6 +44,22 @@
 
 /* INTERNAL DATA & DATA STRUCTURES */
 
+// supported item types.
+typedef enum { String, Pid, Item } ItemType;
+
+/* used to represent unpacked buffers, decoding using ei functions */
+typedef struct {
+  /* atom tag */
+  char *tag;
+  /* type identifier */
+  ItemType type;
+  /* union for buffer or term */
+  union {
+    char *buffer;
+    void *data;
+  } payload;
+} PropListItem;
+
 // typedef void InitEngineFunc(xsl_engine* engine);
 typedef void (*init_func)(XslEngine*);
 
@@ -56,6 +72,7 @@ typedef struct {
 
 typedef struct {
   void* port;
+  void* logging_port;
   XslEngine* engine;
   LoaderSpec* loader;
 } DriverHandle;
@@ -258,7 +275,8 @@ init_provider(DriverHandle *drv, char *buff) {
   }
   
   drv->loader = lib;
-  lib->name = buff;
+  lib->name = ALLOC(strlen(buff));
+  strcpy(lib->name, buff);
   load_library(lib);
 
   if (lib->library == NULL) {

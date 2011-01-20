@@ -31,9 +31,38 @@
 #ifndef _ERLXSL_EI_H
 #define _ERLXSL_EI_H
 
+#include <ei.h>
+
 /* FORWARD DEFINES */
 
+#define _PID_NUM_SIZE     15
+
+typedef unsigned int Uint;
+
+// FIXME: type check against this definition:
+//
+// #if SIZEOF_VOID_P == SIZEOF_LONG
+// typedef unsigned long Eterm;
+// typedef unsigned long Uint;
+// typedef long          Sint;
+// #define ERTS_SIZEOF_ETERM SIZEOF_LONG
+// #elif SIZEOF_VOID_P == SIZEOF_INT
+// typedef unsigned int Eterm;
+// typedef unsigned int Uint;
+// typedef int          Sint;
+// #define ERTS_SIZEOF_ETERM SIZEOF_INT
+// #else
+// #error Found no appropriate type to use for 'Eterm', 'Uint' and 'Sint'
+// #endif
+
+#define make_pid_data(Ser, Num) \
+    ((Uint) ((Ser) << _PID_NUM_SIZE | (Num)))
+
+#define DECODE_OK(decode) (decode == 0)
+
 /* ERLANG INTERFACE FUNCTIONS */
+
+static DriverState decode_ei_cmd(Command*, char*, int*);
 
 /* Allocates all neccessary heap space for the next serialised term
    in the supplied buffer. If a mapping to an internal structure is known
@@ -44,13 +73,98 @@
    - lists are converted to a skip list and terms allocated by recursively applying the rule(s)
    - tuples are not supported and cause the funtion to return UnsupportedOperationError
 */
-/*
-static DriverState alloc_ei(void **target, char *buf, int *index, int *size) {
+static DriverState decode_ei_cmd(Command *command, char *buf, int *index) {
   int type;
-  
-  
-  return UnsupportedOperationError;
+  int size = 0;
+  int arity;
+  DriverState state;
+
+  if (!DECODE_OK(ei_get_type(buf, index, &type, &size))) {
+    return DecodeError;
+  }
+
+  switch (type) {
+    case ERL_SMALL_TUPLE_EXT:
+      // the ONLY kind of tuple that we play with is a {tag, Value} pair. 
+      // this is encoded as a PropListItem
+      if (DECODE_OK(ei_decode_tuple_header(buf, index, &arity))) {
+        if (arity != 2) {
+          return UnsupportedOperationError;
+        }
+        while(arity > 0) {
+          if ((state = decode_ei_cmd(command, buf, index)) != Success) {
+            return state;
+          }
+          arity--;
+        }
+        state = Success;
+      }
+      break;
+    case ERL_ATOM_EXT:
+      INFO("processing atom at index %i\n", (*index));
+      char *pcmd = ALLOC(sizeof(char) * MAXATOMLEN);
+      if (DECODE_OK(ei_decode_atom(buf, index, pcmd))) {
+        // atoms are always command strings
+        command->command_string = ALLOC(strlen(pcmd));
+        char *cmd = (char *)command->command_string;
+        strcpy(cmd, pcmd);
+        INFO("assigned unpacked atom buffer %s\n", command->command_string);
+        state = Success;
+      } else {
+        state = DecodeError;
+      }
+      break;
+    case ERL_STRING_EXT:
+      INFO("processing string at index %i\n", (*index));
+      char *data;
+      if ((data = ALLOC(size + 1)) == NULL) {
+        state = OutOfMemory;
+      } else {
+        if (DECODE_OK(ei_decode_string(buf, index, data))) {
+          if ((command->command_data.iov = ALLOC(sizeof(DriverIOVec))) == NULL) {
+            DRV_FREE(data); // we don't get another chance to free this buffer
+            state = OutOfMemory;
+          } else {
+            INFO("assigning unpacked buffer %s\n", data);
+            command->command_data.iov->dirty = 1;
+            command->command_data.iov->type = Text;
+            command->command_data.iov->size = size + 1;
+            command->command_data.iov->payload.buffer = data;
+            state = Success;
+          }
+        }
+      }
+      break;
+    case ERL_PID_EXT:
+      INFO("processing pid at index %i\n", (*index));
+      erlang_pid *pid; 
+      if ((pid = ALLOC(sizeof(erlang_pid))) == NULL) {
+        state = OutOfMemory;
+      } else {
+        if (DECODE_OK(ei_decode_pid(buf, index, pid))) {
+          if ((command->command_data.iov = ALLOC(sizeof(DriverIOVec))) == NULL) {
+            DRV_FREE(pid);
+            state = OutOfMemory;
+          } else {
+            INFO("transforming pid number %i\n", (Int32)pid->num);
+            ErlDrvTermData *data = ALLOC(sizeof(ErlDrvTermData));
+            *data = make_pid_data(pid->serial, pid->num);
+            command->command_data.iov->dirty = 1;
+            command->command_data.iov->type = Term;
+            command->command_data.iov->size = sizeof(erlang_pid);
+            command->command_data.iov->payload.data = (void*)data;
+            state = Success;
+          }
+        } else {
+          state = DecodeError;
+        }
+      }
+      break;
+    default:  
+      state = DecodeError;
+  }
+  return state;
 };
-*/
 
 #endif /* _ERLXSL_EI_H */
+

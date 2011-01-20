@@ -35,6 +35,7 @@
 
 // The erlxsl_driver header brings in the main erlxsl header and major pervasive includes
 #include "erlxsl_driver.h"
+#include "erlxsl_ei.h"
 
 /* INTERNAL DATA & DATA STRUCTURES */
 
@@ -51,6 +52,7 @@ static ErlDrvData
 start_driver(ErlDrvPort port, char *buff) {
   atom_result = driver_mk_atom("result");
   atom_error  = driver_mk_atom("error");
+  atom_log    = driver_mk_atom("log");
 
   // avoid total madness! nice tip that one...
   if (port == NULL) {
@@ -62,6 +64,7 @@ start_driver(ErlDrvPort port, char *buff) {
     return ERL_DRV_ERROR_GENERAL; // TODO: use ERL_DRV_ERROR_ERRNO and provide out-of-memory info
   }
   d->port = (void*)port;    
+  d->logging_port = NULL;
   return (ErlDrvData)d;
 };
 
@@ -76,9 +79,14 @@ stop_driver(ErlDrvData drv_data) {
   INFO("provider handoff: shutdown\n");
   engine->shutdown(state);
   
+  // unload engine/so_library
+  INFO("unloading library %s\n", d->loader->name);
+  dlclose((void*)d->loader->library); 
+
   // driver cleanup
-  driver_free((char*)engine);
-  driver_free((char*)drv_data);
+  driver_free(engine);
+  driver_free(d->loader);
+  driver_free(drv_data);
 };
 
 /*
@@ -112,6 +120,7 @@ call(ErlDrvData drv_data, unsigned int command, char *buf,
   int index = 0;
   int rindex = 0;
   /*int arity;  
+   *
   char cmd[MAXATOMLEN];*/
   char *data;
   DriverState state;    
@@ -121,22 +130,54 @@ call(ErlDrvData drv_data, unsigned int command, char *buf,
   if (command == INIT_COMMAND) {
     ei_get_type(buf, &index, &type, &size);
     INFO("ei_get_type %s of size = %i\n", ((char*)&type), size);
+    // TODO: pull options tuple instead
     data = ALLOC(size + 1); 
     ei_decode_string(buf, &index, data);
     INFO("Driver received data %s\n", data);
     state = init_provider(d, data);
   } else if (command == ENGINE_COMMAND) {
-    ei_get_type(buf, &index, &type, &size);
+    DriverContext *ctx = ALLOC(sizeof(DriverContext));
+    // ErlDrvPort port = (ErlDrvPort)d->port;
+    // XslEngine *engine = (XslEngine*)d->engine;
+    // ErlDrvTermData callee_pid = driver_caller(port);  
+    Command *cmd = init_command(NULL, ctx, NULL, init_iov(Text, 0, NULL));
+    
+    state = decode_ei_cmd(cmd, buf, &index);
+    if (state == Success) {
+      XslEngine *engine = (XslEngine*)d->engine;
+      if (engine->command != NULL) {
+        EngineState enstate = engine->command(cmd);
+        if (enstate == Ok) {
+          state = Success;
+        }
+      }
+    }
+    /*ei_get_type(buf, &index, &type, &size);
     INFO("ei_get_type %s of size = %i\n", ((char*)&type), size);
     data = ALLOC(size + 1); 
-    ei_decode_string(buf, &index, data);
+    ei_decode_string(buf, &index, data);*/
   } else {
     state = UnknownCommand;
   }
   
   ei_encode_version(*rbuf, &rindex);
   if (state == InitOk) {
+    INFO("Provider configured with library %s\n", d->loader->name);
+#ifdef _DRV_SASL_LOGGING
+    // TODO: pull the logging_port and install it....
+#endif
     ei_encode_atom(*rbuf, &rindex, "configured");
+  } else if (state == Success) {
+    ei_encode_tuple_header(*rbuf, &rindex, 2);
+    ei_encode_atom(*rbuf, &rindex, "ok");
+    if (state == OutOfMemory) {
+      ei_encode_string(*rbuf, &rindex, heap_space_exhausted);
+    } else if (state == UnknownCommand) {
+      ei_encode_string(*rbuf, &rindex, unknown_command);
+    } else {
+      const char *err = (d->loader)->error_message;
+      ei_encode_string_len(*rbuf, &rindex, err, strlen(err));
+    }
   } else {
     ei_encode_tuple_header(*rbuf, &rindex, 2);
     ei_encode_atom(*rbuf, &rindex, "error");

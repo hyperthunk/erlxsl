@@ -8,8 +8,12 @@
     erlxsl_fast_log,
     erlxsl_marshall,
     erlxsl_port_controller,
-    erlxsl_sup]},
+    erlxsl_sup,
+    erlxsl_util]},
   {registered,[erlxsl_port_controller,erlxsl_fast_logger]},
   {applications,[kernel,stdlib,sasl]},
   {env,
-   [{driver_options,[{engine,"default_provider"},{driver,"erlxsl"}, {load_path, "priv/bin"}]}]}]}.
+   [{driver_options,
+     [{engine,"default_provider"},
+      {driver,"erlxsl"},
+      {load_path,"priv/bin"}]}]}]}.

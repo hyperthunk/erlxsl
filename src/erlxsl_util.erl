@@ -32,51 +32,18 @@
 % @doc  erlxsl port controller tests
 %
 
--module(port_controller_SUITE).
--author('Tim Watson <watson.timothy@gmail.com>').
+-module(erlxsl_util).
+
 -compile(export_all).
 
--include_lib("common_test/include/ct.hrl").
--include_lib("eunit/include/eunit.hrl").
--include_lib("hamcrest/include/hamcrest.hrl").
--include("../include/erlxsl.hrl").
--include("../include/test.hrl").
+os_platform() ->
+  match_platform(["darwin", "linux", "win32", "windows"]).
 
-% public api exports
-
-% automatically registers all exported functions as test cases
-all() ->
-    ?EXPORT_TESTS(?MODULE).
-
-init_per_suite(C) ->
-  BaseDir  = filename:rootname(filename:dirname(filename:absname(code:which(?MODULE))), "test"),
-  PrivDir = filename:join(filename:join(BaseDir, "priv"), "bin"),
-  % ?config(priv_dir, C),
-  AppSpec = ct:get_config(test_app_config),
-  {application, erlxsl, Conf} = AppSpec, 
-  {env, Env} = lists:keyfind(env, 1, Conf),
-  {driver_options, Opts} = lists:keyfind(driver_options, 1, Env),
-  UpdatedOpts = 
-  case erlxsl_util:os_platform() of
-    darwin -> lists:keyreplace(load_path, 1, Opts, {load_path, PrivDir});
-    _ -> Opts
-  end,
-  Lib = proplists:get_value(engine, UpdatedOpts),
-  ct:pal("startup with lib ~p~n", [Lib]),
-  UpdatedOpts2 = lists:keyreplace(engine, 1, UpdatedOpts, 
-    {engine, filename:join(filename:join(BaseDir, "priv/test/bin"), Lib)}),
-  UpdatedEnv = lists:keyreplace(driver_options, 1, Env, {driver_options, UpdatedOpts2}),
-  UpdatedConf = lists:keyreplace(env, 1, Conf, {env, UpdatedEnv}),
-  TestAppSpec = {application, erlxsl, UpdatedConf},
-  application:load(TestAppSpec),
-  erlxsl_app:start(),
-  C.
-
-end_per_suite(_) ->
-  erlxsl_app:stop().
-
-driver_startup(_) ->
-  X = erlxsl_port_controller:transform(<<"<input_data />">>, <<"<output />">>),
-  ct:pal("X = ~p~n", [X]),
-  ?assertThat(X, equal_to(<<"<input_data /><output />">>)).
+-spec(match_platform(list(string())) -> atom()).
+match_platform([H|T]) ->
+  case re:run(erlang:system_info(system_architecture), H, [{capture, none}]) of
+    match -> list_to_atom(H);
+    _ -> match_platform(T)
+  end;
+match_platform([]) -> unknown.
 

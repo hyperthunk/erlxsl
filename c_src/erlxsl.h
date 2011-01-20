@@ -103,6 +103,28 @@ extern "C" {
         ? iov->payload.buffer       \
         : NULL))
 
+/*#define append_data(item, cmd)  \
+  ((cmd == NULL || item == NULL) \
+    ? (void*)NULL \
+    : (cmd->command_data.iov->size += 1, \
+       cmd->command_data.iov->payload.data = item))
+*/
+
+#define write_cmd_data(item, cmd) \
+ ((cmd == NULL || item == NULL) \
+   ? (void*)NULL \
+   : (cmd->command_data.iov->size > 0) \
+      ? ((cmd->command_data.iov->payload.data = \
+         cmd->resize(cmd->command_data.iov->payload.data, cmd->command_data.iov->size += 1)), \
+         memcpy(((cmd->command_data.iov) + (cmd->command_data.iov->size - 1)), \
+           item, sizeof(item))) \
+      : (cmd->command_data.iov->size += 1, cmd->command_data.iov->payload.data = item))
+
+
+/* Resizes the result buffer of 'cmd' using its 'resize' function
+ * pointer to the 'newsize'. The DriverIOVec size is updated and 
+ * the expression evaluates to the (potentially re-positioned) reassigned buffer.
+ */
 #define resize_result_buffer(newsize, cmd) \
   (cmd->result->payload.buffer = \
     cmd->resize(cmd->result->payload.buffer, cmd->result->size = (Int32)newsize))
@@ -182,7 +204,8 @@ typedef enum {
   UnknownCommand,
   UnsupportedOperationError,
   BadArgumentError,
-  EmptyBufferError
+  EmptyBufferError,
+  DecodeError
 } DriverState;
 
 /* Indicates the transient state of an XslEngine - used primarily for error reporting. */
@@ -206,7 +229,9 @@ typedef enum {
 /* Indicator of the format for data stored in a DriverIOVec. */
 typedef enum { 
   /* Binary data (i.e., ErlDrvBinary). */
-  Binary, 
+  Binary,
+  /* ErlDrvTermData */
+  Term, 
   /* An ErlXSL API Object. */
   Object, 
   /* A char buffer of raw data. */

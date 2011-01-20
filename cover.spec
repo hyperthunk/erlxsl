@@ -5,4 +5,5 @@
   erlxsl_fast_log,
   erlxsl_marshall,
   erlxsl_port_controller,
-  erlxsl_sup]}.
+  erlxsl_sup,
+  erlxsl_util]}.

@@ -175,6 +175,8 @@ handle_cast({error, Format, Args}, State) ->
 handle_cast(_Msg, State) ->
   {noreply, State}.
 
+handle_info({driver_log, {Level, Format}}, State) ->
+  handle_cast({Level, Format}, State);
 handle_info(_Info, State) ->
   {noreply, State}.
 
