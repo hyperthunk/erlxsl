@@ -31,7 +31,11 @@
 #ifndef _ERLXSL_EI_H
 #define _ERLXSL_EI_H
 
+#ifndef _EI_TEST
 #include <ei.h>
+#else
+#include "ei_test.h"
+#endif
 
 /* FORWARD DEFINES */
 
@@ -82,6 +86,9 @@ static DriverState decode_ei_cmd(Command *command, char *buf, int *index) {
   if (!DECODE_OK(ei_get_type(buf, index, &type, &size))) {
     return DecodeError;
   }
+  
+  PropListItem *item; 
+  // FIXME: rewrite this to generate and store PropListItem instead of writing directy to Command
 
   switch (type) {
     case ERL_SMALL_TUPLE_EXT:
@@ -91,6 +98,13 @@ static DriverState decode_ei_cmd(Command *command, char *buf, int *index) {
         if (arity != 2) {
           return UnsupportedOperationError;
         }
+        if ((item = ALLOC(sizeof(PropListItem))) == NULL) {
+          return OutOfMemory;
+        }
+        
+        // safely allocates or does resize + append onto command->command_data.iov->payload.data
+        write_cmd_data(item, command);
+        
         while(arity > 0) {
           if ((state = decode_ei_cmd(command, buf, index)) != Success) {
             return state;
@@ -105,10 +119,11 @@ static DriverState decode_ei_cmd(Command *command, char *buf, int *index) {
       char *pcmd = ALLOC(sizeof(char) * MAXATOMLEN);
       if (DECODE_OK(ei_decode_atom(buf, index, pcmd))) {
         // atoms are always command strings
-        command->command_string = ALLOC(strlen(pcmd));
-        char *cmd = (char *)command->command_string;
-        strcpy(cmd, pcmd);
-        INFO("assigned unpacked atom buffer %s\n", command->command_string);
+        item = (PropListItem*)command->command_data.iov->payload.data;
+        item->tag = ALLOC(strlen(pcmd));
+        // char *cmd = (char *)item->tag;
+        strcpy((char *)item->tag, pcmd);
+        INFO("assigned unpacked atom buffer %s\n", item->tag);
         state = Success;
       } else {
         state = DecodeError;
@@ -121,15 +136,13 @@ static DriverState decode_ei_cmd(Command *command, char *buf, int *index) {
         state = OutOfMemory;
       } else {
         if (DECODE_OK(ei_decode_string(buf, index, data))) {
-          if ((command->command_data.iov = ALLOC(sizeof(DriverIOVec))) == NULL) {
+          item = (PropListItem*)command->command_data.iov->payload.data;        
+          if ((item->payload.buffer = strlen(data)) == NULL) {
             DRV_FREE(data); // we don't get another chance to free this buffer
             state = OutOfMemory;
           } else {
             INFO("assigning unpacked buffer %s\n", data);
-            command->command_data.iov->dirty = 1;
-            command->command_data.iov->type = Text;
-            command->command_data.iov->size = size + 1;
-            command->command_data.iov->payload.buffer = data;
+            item->payload.buffer = strcpy(item->payload.buffer, data);
             state = Success;
           }
         }

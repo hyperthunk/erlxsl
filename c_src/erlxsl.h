@@ -110,16 +110,39 @@ extern "C" {
        cmd->command_data.iov->payload.data = item))
 */
 
-#define write_cmd_data(item, cmd) \
+#define get_item(item_type, item_index) \
+  (((item_type*)cmd->command_data.iov->payload.data) + item_index)
+
+#define write_cmd_data(item_T, item, cmd) \
  ((cmd == NULL || item == NULL) \
    ? (void*)NULL \
    : (cmd->command_data.iov->size > 0) \
       ? ((cmd->command_data.iov->payload.data = \
-         cmd->resize(cmd->command_data.iov->payload.data, cmd->command_data.iov->size += 1)), \
-         memcpy(((cmd->command_data.iov) + (cmd->command_data.iov->size - 1)), \
-           item, sizeof(item))) \
+         /* resize uses realloc, which will move the original payload for us! */ \
+         cmd->resize(cmd->command_data.iov->payload.data, (sizeof(item_T) * (cmd->command_data.iov->size += 1)))), \
+         memcpy((((item_T*)cmd->command_data.iov->payload.data) + (cmd->command_data.iov->size - 1)), item, sizeof(item_T))) \
       : (cmd->command_data.iov->size += 1, cmd->command_data.iov->payload.data = item))
 
+#define write_cmd_data2(item_T, item, cmd) \
+  do { \
+    if (cmd != NULL && item != NULL) {  \
+      Int32 size = cmd->command_data.iov->size; \
+      if (size > 0) { \
+        Int32 idx = size -1;  \
+        item_T *p = (item_T*)cmd->command_data.iov->payload.data;  \
+        item_T *chunk = (item_T*)cmd->resize(cmd->command_data.iov->payload.data, \
+            (sizeof(item_T) * cmd->command_data.iov->size));  \
+        cmd->command_data.iov->payload.data = chunk;  \
+        for (Int32 i = 0; i < idx; i++) { \
+          chunk[i] = p[i];  \
+        } \
+        chunk[idx] = item;  \
+      } else {  \
+        cmd->command_data.iov->size += 1;   \
+        cmd->command_data.iov->payload.data = item; \
+      } \
+    } \
+  } while (false)
 
 /* Resizes the result buffer of 'cmd' using its 'resize' function
  * pointer to the 'newsize'. The DriverIOVec size is updated and 

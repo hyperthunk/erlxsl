@@ -36,6 +36,22 @@ static char *command_foo = "command_foo";
 static char *assigned_data = "data";
 static char *combined_data = "datadata";
 
+static void do_write_cmd_data(PropListItem *item, Command *cmd) {
+  do { 
+    if (cmd != NULL && item != NULL) {  
+      if (cmd->command_data.iov->size > 0) { 
+        cmd->command_data.iov->payload.data = 
+            cmd->resize(cmd->command_data.iov->payload.data,
+                (sizeof(PropListItem) * (cmd->command_data.iov->size += 1)));
+        memcpy((((PropListItem*)cmd->command_data.iov->payload.data) + 1), item, sizeof(PropListItem));
+      } else {
+        cmd->command_data.iov->size += 1;
+        cmd->command_data.iov->payload.data = item;
+      }
+    }
+  } while (false);
+};
+
 describe "ALLOC macro expansion"
 
   it "should use the supplied (underlying) function!"
@@ -258,25 +274,11 @@ end
   
 describe "Assigning command_data Objects using the supplied macros"
 
-  it "should evaluate to NULL when the supplied Command is also NULL"
-    Command *cmd = NULL;
-    PropListItem *item = ALLOC(sizeof(PropListItem));
-    write_cmd_data(item, cmd) should be NULL;
-    DRV_FREE(item);
-  end
-  
-  it "should evaluate to NULL when the supplied item is also NULL"
-    create_test_data(test_command, command_string_transform);
-    Command *cmd = init_command(test_command, NULL, NULL, NULL);
-    PropListItem *item = NULL;
-    write_cmd_data(item, cmd) should be NULL;
-  end
-
   it "should allocate an initial slot and set the length/size property accordingly"
     create_test_data(test_command, command_string_transform);
     Command *cmd = init_command(test_command, NULL, NULL, init_iov(Object, 0, NULL));
     PropListItem *item = ALLOC(sizeof(PropListItem));
-    write_cmd_data(item, cmd) should not be NULL;
+    write_cmd_data(PropListItem, item, cmd);
     
     DriverIOVec *iov = cmd->command_data.iov;
     
@@ -287,31 +289,22 @@ describe "Assigning command_data Objects using the supplied macros"
     data should point_to item;
   end
   
-  it "should extend already allocated command data, to compensate for additional items"
+  it "should allocate an initial slot and set the length/size property accordingly"
     create_test_data(test_command, command_string_transform);
     Command *cmd = init_command(test_command, NULL, NULL, init_iov(Object, 0, NULL));
-
     PropListItem *item = ALLOC(sizeof(PropListItem));
-    item->tag = "crummy data";
+    item->tag = "p1";
+    write_cmd_data(PropListItem, item, cmd);
 
-    write_cmd_data(item, cmd) should not be NULL;
-  
-    DriverIOVec *iov = cmd->command_data.iov;
-    iov should not be NULL;
-    iov->size should equal 1;
-    
     PropListItem *item2 = ALLOC(sizeof(PropListItem));
-    item2->tag = "some data";
-    
-    PropListItem *pnew = 
-      write_cmd_data(item2, cmd);
-    
-    pnew should not be NULL;
-    pnew->tag should be_equal_to item2->tag;
-    
-    PropListItem *original = (PropListItem*)cmd->command_data.iov->payload.data;
-    original->tag should be_equal_to item->tag;
+    item2->tag = "p2";
+    write_cmd_data(PropListItem, item2, cmd);
+
+    PropListItem *curr = cmd->command_data.iov->payload.data;
+    curr->tag should be_equal_to "p1";
+    curr++;
+    curr->tag should be_equal_to "p2";
   end
-  
+
 end
 
