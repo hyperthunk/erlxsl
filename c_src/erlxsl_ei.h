@@ -103,7 +103,7 @@ static DriverState decode_ei_cmd(Command *command, char *buf, int *index) {
         }
         
         // safely allocates or does resize + append onto command->command_data.iov->payload.data
-        write_cmd_data(item, command);
+        write_cmd_data(PropListItem, item, command);
         
         while(arity > 0) {
           if ((state = decode_ei_cmd(command, buf, index)) != Success) {
@@ -116,6 +116,7 @@ static DriverState decode_ei_cmd(Command *command, char *buf, int *index) {
       break;
     case ERL_ATOM_EXT:
       INFO("processing atom at index %i\n", (*index));
+      // TODO: drop the intermediate data and copy operations.
       char *pcmd = ALLOC(sizeof(char) * MAXATOMLEN);
       if (DECODE_OK(ei_decode_atom(buf, index, pcmd))) {
         // atoms are always command strings
@@ -136,7 +137,8 @@ static DriverState decode_ei_cmd(Command *command, char *buf, int *index) {
         state = OutOfMemory;
       } else {
         if (DECODE_OK(ei_decode_string(buf, index, data))) {
-          item = (PropListItem*)command->command_data.iov->payload.data;        
+          item = (PropListItem*)command->command_data.iov->payload.data;
+          // FIXME: WTF is this doing? surely you want to allocate and/or copy!?
           if ((item->payload.buffer = strlen(data)) == NULL) {
             DRV_FREE(data); // we don't get another chance to free this buffer
             state = OutOfMemory;
@@ -148,7 +150,7 @@ static DriverState decode_ei_cmd(Command *command, char *buf, int *index) {
         }
       }
       break;
-    case ERL_PID_EXT:
+    /*case ERL_PID_EXT:
       INFO("processing pid at index %i\n", (*index));
       erlang_pid *pid; 
       if ((pid = ALLOC(sizeof(erlang_pid))) == NULL) {
@@ -172,7 +174,7 @@ static DriverState decode_ei_cmd(Command *command, char *buf, int *index) {
           state = DecodeError;
         }
       }
-      break;
+      break;*/
     default:  
       state = DecodeError;
   }

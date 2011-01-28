@@ -25,3 +25,4 @@ inttest/spec/all_specs.c
 c_src/cscope.outcscope.out
 *.swp
 **/*.swp
+inttest/deps/cspec
