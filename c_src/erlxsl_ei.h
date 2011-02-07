@@ -33,8 +33,6 @@
 
 #ifndef _EI_TEST
 #include <ei.h>
-#else
-#include "ei_test.h"
 #endif
 
 /* FORWARD DEFINES */
@@ -82,7 +80,6 @@ static DriverState decode_ei_cmd(Command *command, char *buf, int *index) {
   int size = 0;
   int arity;
   DriverState state;
-
   if (!DECODE_OK(ei_get_type(buf, index, &type, &size))) {
     return DecodeError;
   }
@@ -139,7 +136,7 @@ static DriverState decode_ei_cmd(Command *command, char *buf, int *index) {
         if (DECODE_OK(ei_decode_string(buf, index, data))) {
           item = (PropListItem*)command->command_data.iov->payload.data;
           // FIXME: WTF is this doing? surely you want to allocate and/or copy!?
-          if ((item->payload.buffer = strlen(data)) == NULL) {
+          if ((strncpy(item->payload.buffer, data, strlen(data)) == NULL)) {
             DRV_FREE(data); // we don't get another chance to free this buffer
             state = OutOfMemory;
           } else {

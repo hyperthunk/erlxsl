@@ -36,22 +36,6 @@ static char *command_foo = "command_foo";
 static char *assigned_data = "data";
 static char *combined_data = "datadata";
 
-static void do_write_cmd_data(PropListItem *item, Command *cmd) {
-  do { 
-    if (cmd != NULL && item != NULL) {  
-      if (cmd->command_data.iov->size > 0) { 
-        cmd->command_data.iov->payload.data = 
-            cmd->resize(cmd->command_data.iov->payload.data,
-                (sizeof(PropListItem) * (cmd->command_data.iov->size += 1)));
-        memcpy((((PropListItem*)cmd->command_data.iov->payload.data) + 1), item, sizeof(PropListItem));
-      } else {
-        cmd->command_data.iov->size += 1;
-        cmd->command_data.iov->payload.data = item;
-      }
-    }
-  } while (false);
-};
-
 describe "ALLOC macro expansion"
 
   it "should use the supplied (underlying) function!"
@@ -275,7 +259,7 @@ end
 describe "Assigning command_data Objects using the supplied macros"
 
   it "should allocate an initial slot and set the length/size property accordingly"
-    create_test_data(test_command, command_string_transform);
+    create_test_data(test_command, command_foo);
     Command *cmd = init_command(test_command, NULL, NULL, init_iov(Object, 0, NULL));
     PropListItem *item = ALLOC(sizeof(PropListItem));
     write_cmd_data(PropListItem, item, cmd);
@@ -287,10 +271,11 @@ describe "Assigning command_data Objects using the supplied macros"
     
     PropListItem *data = (PropListItem*)iov->payload.data;
     data should point_to item;
+    free_command(cmd);
   end
   
   it "should allocate an initial slot and set the length/size property accordingly"
-    create_test_data(test_command, command_string_transform);
+    create_test_data(test_command, command_foo);
     Command *cmd = init_command(test_command, NULL, NULL, init_iov(Object, 0, NULL));
     PropListItem *item = ALLOC(sizeof(PropListItem));
     item->tag = "p1";
@@ -304,6 +289,7 @@ describe "Assigning command_data Objects using the supplied macros"
     curr->tag should be_equal_to "p1";
     curr++;
     curr->tag should be_equal_to "p2";
+    free_command(cmd);
   end
 
 end

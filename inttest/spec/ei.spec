@@ -1,5 +1,5 @@
 /*
- * spec_includes.h
+ * so_loading.spec
  * 
  * -----------------------------------------------------------------------------
  * Copyright (c) 2008-2010 Tim Watson (watson.timothy@gmail.com)
@@ -23,70 +23,26 @@
  * THE SOFTWARE.
  * -----------------------------------------------------------------------------
  * Notes: If you're looking at a version of this file with the extension .c then
- * you're looking at generated code. For the original test specifications, please
- * look at the file with the .spec extension instead.
+ * you're looking at generated code. For the original test specifications, 
+ * please look at the file with the .spec extension instead.
  */
 
-#ifndef _SPEC_INCL_H
-#define _SPEC_INCL_H
-
-#define _EI_TEST 1
-
 #include "cspec.h"
-#include <stdbool.h>
+#include "spec_includes.h"
+#include "ei_test.h"
+#include "erlxsl_ei.h"
 
-bool allow_allocations = true;
-size_t allow_allocation_sizes = -1;
-char assert_failed[2046];
+describe "Decoding Buffers using EI"
 
-// overwrite ALLOC macro
+  it "should return DecodeError when the initial type check fails"
+    char *buf = "12345";
+    int index = 0;
+    Command *cmd = ALLOC(sizeof(Command));
+    DriverState state;
+    
+    with_ei_fail(state = decode_ei_cmd(cmd, buf, &index));
+    state should be DecodeError;
+  end
 
-void *_spec_alloc(size_t size) {
-  if (allow_allocations == false) return NULL;
-  if (allow_allocation_sizes == -1 || allow_allocation_sizes == size) {
-    return malloc(size);
-  } else {
-    return NULL;
-  }
-};
+end
 
-#define ALLOC(size) _spec_alloc(size)
-
-#define do_with_nomem(stmt) \
-  allow_allocations = false; stmt; \
-  allow_allocations = true
-
-#define with_denied_allocation(size, stmt)  \
-  allow_allocation_sizes = size; stmt; \
-  allow_allocation_sizes = -1;
-
-#define create_test_data(Out, In)    \
-  char *Out = ALLOC(sizeof(char) * strlen(In));  \
-  strcpy(Out, In)
-
-#define match_be_equal_to(A, E) \
-  (strncmp(A, E, strlen(E)) == 0)
-
-// override 'assert' behaviour
-
-#define _TEST_ASSERT true
-
-#define ASSERT(_s)  \
-  (!(_s) \
-    ? (strcpy(assert_failed, #_s))  \
-    : ((void) 0))
-
-void _spec_free(void *x) {
-  if (x != NULL) {
-    free(x);
-  }
-};
-
-#define _DRV_FREE
-#define DRV_FREE(x) \
-  do { DBG("Free " #x " [%p]", x); \
-    _spec_free(x); } while (false)
-
-#include "erlxsl_port.h"
-
-#endif /* _SPEC_INCL_H */
