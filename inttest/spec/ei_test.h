@@ -53,7 +53,8 @@
 
 #define with_atom(s, expr) \
   do { \
-    *test_type = ERL_ATOM_EXT; \
+    test_type = ERL_ATOM_EXT; \
+    test_buff = s; \
     do { \
       expr; \
     } while (false)\
@@ -61,7 +62,8 @@
 
 #define with_string(s, expr) \
   do { \
-    *test_type = ERL_STRING_EXT; \
+    test_type = ERL_STRING_EXT; \
+    test_buff = s; \
     do { \
       expr; \
     } while (false)\
@@ -69,12 +71,16 @@
 
 #define with_tuple(size, expr) \
   do { \
-    *test_type = ERL_SMALL_TUPLE_EXT; \
-    *test_arity = size; \
-    do { \
-      expr; \
-    } while (false)\
+    test_type = ERL_SMALL_TUPLE_EXT; \
+    test_arity = size; \
+    expr; \
   } while(false)
+
+#define with_type(type, expr) \
+  do { \
+    test_type = type; \
+    expr; \
+  } while (false)
 
 #define with_ei_fail(expr) \
   do { \
@@ -89,25 +95,23 @@ static int ei_decode_atom(const char *buf, int *index, char *p);
 static int ei_decode_tuple_header(const char *buf, int *index, int *arity);
 
 static char *test_buff = NULL;
-static int *test_type;
+static int test_type;
 static bool test_fail = false;
-static int *test_arity;
+static int test_arity;
 
 static int ei_get_type(const char *buf, const int *index, int *type, int *size) {
   // buf is ignored...
-  INFO("checking %i\n", test_fail);
   if (test_fail == true) {
-    puts("failing");
     return 1;
   }
-  *type = *test_type;
+  *type = test_type;
   return 0;
 };
 
 static int ei_decode_tuple_header(const char *buf, int *index, int *arity) {
   // buf is ignored...
   if (test_fail) return 1;
-  *arity= *test_arity;
+  *arity= test_arity;
   (*index)++;
   return 0;
 };

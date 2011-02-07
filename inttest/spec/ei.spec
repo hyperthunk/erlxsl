@@ -42,6 +42,32 @@ describe "Decoding Buffers using EI"
     
     with_ei_fail(state = decode_ei_cmd(cmd, buf, &index));
     state should be DecodeError;
+    free_command(cmd);
+  end
+
+  it "should return DecodeError when the initial type check returns an unexpected value"
+    char *buf = "12345";
+    int index = 0;
+    Command *cmd = ALLOC(sizeof(Command));
+    DriverState state;
+    
+    with_type(ERL_FUN_EXT, state = decode_ei_cmd(cmd, buf, &index));
+    state should be DecodeError;
+    free_command(cmd);
+  end
+
+  it "should return OutOfMemory when allocation fails"
+    char *buf = "12345";
+    int index = 0;
+    int tuple_size = 2;
+    Command *cmd = ALLOC(sizeof(Command));
+    DriverState state;
+    
+    with_tuple(tuple_size, 
+      do_with_nomem(state = decode_ei_cmd(cmd, buf, &index))
+    );
+    state should be OutOfMemory;
+    free_command(cmd);
   end
 
 end

@@ -359,9 +359,10 @@ free_task(XslTask *task) {
 static void
 free_command(Command *cmd) {
   if (cmd != NULL) {
-    if (strcmp("transform", cmd->command_string) == 0) {
+    if (cmd->command_string != NULL && strcmp("transform", cmd->command_string) == 0) {
       free_task(cmd->command_data.xsl_task);
-    } else {    
+    } else {
+      // FIXME: we should be checking the DriverIOVec was actually assigned!
       free_iov(cmd->command_data.iov);
     }
     free_iov(cmd->result);
