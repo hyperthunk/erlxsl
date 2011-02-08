@@ -53,17 +53,17 @@
 
 #define with_atom(s, expr) \
   do { \
-    test_type = ERL_ATOM_EXT; \
-    test_buff = s; \
+    fixture->test_type = ERL_ATOM_EXT; \
+    fixture->test_buff = s; \
     do { \
       expr; \
-    } while (false)\
+    } while (false) \
   } while(false)
 
 #define with_string(s, expr) \
   do { \
-    test_type = ERL_STRING_EXT; \
-    test_buff = s; \
+    fixture->test_type = ERL_STRING_EXT; \
+    fixture->test_buff = s; \
     do { \
       expr; \
     } while (false)\
@@ -71,47 +71,75 @@
 
 #define with_tuple(size, expr) \
   do { \
-    test_type = ERL_SMALL_TUPLE_EXT; \
-    test_arity = size; \
+    fixture->test_type = ERL_SMALL_TUPLE_EXT; \
+    fixture->test_arity = size; \
     expr; \
   } while(false)
 
 #define with_type(type, expr) \
   do { \
-    test_type = type; \
+    fixture->test_type = type; \
     expr; \
   } while (false)
 
 #define with_ei_fail(expr) \
   do { \
-    test_fail = true; \
+    fixture->test_fail = true; \
     expr; \
-    test_fail = false; \
   } while (false)
 
+#define setup_fixture \
+  do { \
+    fixture = ALLOC(sizeof(TestState)); \
+    fixture->test_buff = NULL;  \
+    fixture->test_type = -1;  \
+    fixture->test_fail = false; \
+    fixture->test_arity = -1; \
+    fixture->next = current_fixture; \
+    current_fixture = fixture; \
+  } while (false)
+
+static DriverState decode_ei_cmd(Command*, char*, int*);
+static DriverState decode_ei_cmd_impl(Command*, char*, int*);
 static int ei_get_type(const char *buf, const int *index, int *type, int *size);
 static int ei_decode_string(const char *buf, int *index, char *p);
 static int ei_decode_atom(const char *buf, int *index, char *p);
 static int ei_decode_tuple_header(const char *buf, int *index, int *arity);
 
-static char *test_buff = NULL;
-static int test_type;
-static bool test_fail = false;
-static int test_arity;
+typedef struct test_state {
+  char *test_buff;
+  int test_type;
+  bool test_fail;
+  int test_arity;
+  struct test_state* next;
+} TestState;
+
+static TestState* fixture = NULL;
+static TestState* current_fixture = NULL;
+
+static DriverState decode_ei_cmd(Command *command, char *buf, int *index) {
+  DriverState state;
+  while (current_fixture != NULL) {
+    state = decode_ei_cmd_impl(command, buf, index);
+    current_fixture = current_fixture->next;
+  }
+  // FIXME: release all the fixtures...
+  return state;
+};
 
 static int ei_get_type(const char *buf, const int *index, int *type, int *size) {
   // buf is ignored...
-  if (test_fail == true) {
+  if (current_fixture->test_fail == true) {
     return 1;
   }
-  *type = test_type;
+  *type = current_fixture->test_type;
   return 0;
 };
 
 static int ei_decode_tuple_header(const char *buf, int *index, int *arity) {
   // buf is ignored...
-  if (test_fail) return 1;
-  *arity= test_arity;
+  if (current_fixture->test_fail) return 1;
+  *arity= current_fixture->test_arity;
   (*index)++;
   return 0;
 };
@@ -122,10 +150,10 @@ static int ei_decode_atom(const char *buf, int *index, char *p) {
 
 static int ei_decode_string(const char *buf, int *index, char *p) {
   // buf is ignored...
-  if (test_fail) return 1;
+  if (current_fixture->test_fail) return 1;
   int i = *index;
-  *index = (i += strlen(test_buff));
-  strcpy(p, test_buff);
+  *index = (i += strlen(current_fixture->test_buff));
+  strcpy(p, current_fixture->test_buff);
   return 0;
 };
 

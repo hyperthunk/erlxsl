@@ -39,7 +39,7 @@ describe "Decoding Buffers using EI"
     int index = 0;
     Command *cmd = ALLOC(sizeof(Command));
     DriverState state;
-    
+    setup_fixture;
     with_ei_fail(state = decode_ei_cmd(cmd, buf, &index));
     state should be DecodeError;
     free_command(cmd);
@@ -50,9 +50,21 @@ describe "Decoding Buffers using EI"
     int index = 0;
     Command *cmd = ALLOC(sizeof(Command));
     DriverState state;
-    
+    setup_fixture;
     with_type(ERL_FUN_EXT, state = decode_ei_cmd(cmd, buf, &index));
     state should be DecodeError;
+    free_command(cmd);
+  end
+
+  it "should return UnsupportedOperationError when tuple arity is invalid"
+    char *buf = "12345";
+    int index = 0;
+    int tuple_size = 1;
+    Command *cmd = ALLOC(sizeof(Command));
+    DriverState state;
+    setup_fixture;
+    with_tuple(tuple_size, state = decode_ei_cmd(cmd, buf, &index));
+    state should be UnsupportedOperationError;
     free_command(cmd);
   end
 
@@ -62,7 +74,7 @@ describe "Decoding Buffers using EI"
     int tuple_size = 2;
     Command *cmd = ALLOC(sizeof(Command));
     DriverState state;
-    
+    setup_fixture;
     with_tuple(tuple_size, 
       do_with_nomem(state = decode_ei_cmd(cmd, buf, &index))
     );

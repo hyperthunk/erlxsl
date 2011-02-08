@@ -75,7 +75,12 @@ static DriverState decode_ei_cmd(Command*, char*, int*);
    - lists are converted to a skip list and terms allocated by recursively applying the rule(s)
    - tuples are not supported and cause the funtion to return UnsupportedOperationError
 */
-static DriverState decode_ei_cmd(Command *command, char *buf, int *index) {
+#ifdef _EI_TEST
+static DriverState decode_ei_cmd_impl(Command *command, char *buf, int *index)
+#else
+static DriverState decode_ei_cmd(Command *command, char *buf, int *index)
+#endif
+{
   int type;
   int size = 0;
   int arity;
