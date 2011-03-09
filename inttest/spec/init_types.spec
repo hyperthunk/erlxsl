@@ -280,8 +280,9 @@ describe "Initializing XslTask Structures"
             test_xml, test_xsl);
     
     state should be Success;
+    char *s = assert_failed;
     
-    assert_failed should have_failed_due_to "hsize->input_size == strlen(xml)";
+	s should have_failed_due_to "hsize->input_size == strlen(xml)";
     
     free_task(task);
   end
