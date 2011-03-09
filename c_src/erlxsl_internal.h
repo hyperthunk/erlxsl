@@ -439,8 +439,8 @@ init_task(XslTask *task,
     return EmptyBufferError;
   }
   
-  ASSERT(hsize->input_size == strlen(xml));
-  ASSERT(hsize->xsl_size == strlen(xsl));
+  //ASSERT(hsize->input_size == strlen(xml));
+  //ASSERT(hsize->xsl_size == strlen(xsl));
   
   InputDocument *xmldoc;
   InputDocument *xsldoc;

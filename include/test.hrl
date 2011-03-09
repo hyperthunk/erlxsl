@@ -16,4 +16,4 @@
             end,
             Functions
         )
-    ].
+    ]).
