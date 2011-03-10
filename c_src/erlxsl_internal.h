@@ -84,14 +84,14 @@ typedef struct {
  */
 typedef struct {
   /* The position in which we're expecting the input kind value. */
-  Int8 input_kind;
+  UInt8 input_kind;
   /* The position in which we're expecting the xsl input kind value. */
-  Int8 xsl_kind;
+  UInt8 xsl_kind;
   /*
    * The position in which we're expecting a value
    * denoting the number of parameters being supplied.
    */
-  Int16 param_grp_arity;
+  UInt16 param_grp_arity;
 } InputSpecHeaders;
 
 /*
@@ -100,9 +100,9 @@ typedef struct {
  */
 typedef struct  {
   /* The position in which we're expecting the input size marker value */
-  Int32 input_size;
+  UInt32 input_size;
   /* The position in which we're expecting the xsl size marker value */
-  Int32 xsl_size;
+  UInt32 xsl_size;
 } PayloadSizeHeaders;
 
 /*
@@ -111,9 +111,9 @@ typedef struct  {
  */
 typedef struct request_buffer_argument_outline {
   /* size of the argument name string in the buffer. */
-  Int16  name_size;
+  UInt16  name_size;
   /* size of the argument value string in the buffer. */
-  Int16  value_size;
+  UInt16  value_size;
 } ParameterSpecHeaders;
 
 /* Used as a handle during async processing */ 

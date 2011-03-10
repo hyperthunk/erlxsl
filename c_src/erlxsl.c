@@ -215,8 +215,9 @@ outputv(ErlDrvData drv_data, ErlIOVec *ev) {
   DriverHandle *d = (DriverHandle*)drv_data;
   ErlDrvPort port = (ErlDrvPort)d->port;
   ErlDrvBinary *bin = ev->binv[1];
-  int bin_size = bin->orig_size;
-  Int32 offset = (Int32)(sizeof(InputSpecHeaders) + sizeof(PayloadSizeHeaders));
+  // can't imagine this will ever be negative, but still...
+  UInt32 bin_size = (bin->orig_size) >= 0 ? bin->orig_size : 0;
+  UInt32 offset = (UInt32)(sizeof(InputSpecHeaders) + sizeof(PayloadSizeHeaders));
   
   if (bin_size < offset) {
     error_msg = "InconsistentInputHeaders: driver protocol not recognised.";

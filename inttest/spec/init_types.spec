@@ -65,13 +65,13 @@ describe "Initializing DriverIOVec Structures"
 
   it "should set the 'dirty bit' to zero when there is no payload"
     DriverIOVec *iov = init_iov(Text, 0, NULL);
-    
-    iov->dirty should be 0;    
+
+    iov->dirty should be 0;
     iov->size should be 0;
-    
+
     free_iov(iov);
   end
-  
+
   it "should set the 'dirty bit' to one when there is a payload"
     create_test_data(test_data, payload);
     DriverIOVec *iov = init_iov(Text, strlen(payload), test_data);
@@ -84,7 +84,7 @@ describe "Initializing DriverIOVec Structures"
 
     free_iov(iov);
   end 
-  
+
   it "should set the 'data' union member rather than the 'buffer', when payload is marked as Opaque"
     create_test_data(test_data, payload);
     DriverIOVec *iov = init_iov(Opaque, strlen(test_data), test_data);
@@ -106,7 +106,7 @@ describe "Initializing DriverIOVec Structures"
     char *buffer = iov->payload.buffer;
     void *data = iov->payload.data;
 
-    iov->dirty should be 1;    
+    iov->dirty should be 1;
     iov->size should equal payload_size;
     iov->type should equal Binary;
 
@@ -400,7 +400,7 @@ describe "Initializing Command Structures"
   end
 
   it "should assign the DriverIOVec if provided"
-    create_test_data(test_data, internal_command_string);    
+    create_test_data(test_data, internal_command_string);
     DriverContext *ctx = ALLOC(sizeof(DriverContext));
     ctx->port = NULL;
     DriverIOVec *iov = init_iov(Text, 0, NULL);
@@ -419,4 +419,3 @@ describe "Initializing Command Structures"
   end
 
 end
-
