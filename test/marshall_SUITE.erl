@@ -52,8 +52,7 @@ standard_request_creates_nested_iolist(_) ->
   Xsl = <<"<?xml version='1.0'?>">>,
   ?assertMatch(
     [
-      [_XmlTypeHdr, _XslTypeHdr, _ParamSizeHdr],
-      [_XmlSizeHdr, _XslSizeHdr],
+      [_XmlTypeHdr, _XslTypeHdr],
       [_XmlDataBinary, _XslDataBinary]
     ],
     erlxsl_marshall:pack(?FILE_INPUT, ?FILE_INPUT, Xml, Xsl)
@@ -62,26 +61,10 @@ standard_request_creates_nested_iolist(_) ->
 parameterised_request_becomes_nested_iolist(_) ->
   Xml = <<"<fragment><empty /></fragment>">>,
   Xsl = <<"<?xml version='1.0'?>">>,
-  Parameters = [ {"p1", "value1"}, {"p2", "value2"} ],
+  Parameters = [ {<<"p1">>, <<"value1">>}, {<<"p2">>, <<"value2">>} ],
   ?assertMatch(
-    [
-      [_, _, <<2:16/native-integer>>],
-      [
-        [
-          _P1NameSizeHdr,
-          _P1ValueSizeHdr,
-          _P2NameSizeHdr,
-          _P2ValueSizeHdr
-        ],
-        [
-          <<"p1">>,
-          <<"value1">>,
-          <<"p2">>,
-          <<"value2">>
-        ]
-      ],
-      [_XmlSizeHdr, _XslSizeHdr],
-      [Xml, Xsl]
-    ],
+    [[_, _], [Xml, Xsl],
+     [[<<"p1">>, <<"value1">>],
+      [<<"p2">>, <<"value2">>]]],
     erlxsl_marshall:pack(?FILE_INPUT, ?FILE_INPUT, Xml, Xsl, Parameters)),
   ok.

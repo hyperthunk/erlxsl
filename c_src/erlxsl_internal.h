@@ -1,6 +1,6 @@
 /*
  * erlxsl_internal.h
- * 
+ *
  * -----------------------------------------------------------------------------
  * Copyright (c) 2008-2010 Tim Watson (watson.timothy@gmail.com)
  *
@@ -22,13 +22,13 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  * -----------------------------------------------------------------------------
- * Notes: 
- * 
+ * Notes:
+ *
  * This header contains internal utility functions used by the port program and
- * linked in driver executables. This header *must* be included *after* the 
- * main erlxsl header, and *after* the erlxsl_driver header when the linked-in 
- * driver is being compiled. 
- * 
+ * linked in driver executables. This header *must* be included *after* the
+ * main erlxsl header, and *after* the erlxsl_driver header when the linked-in
+ * driver is being compiled.
+ *
  */
 
 #ifndef _ERLXSL_INT_H
@@ -78,35 +78,25 @@ typedef struct {
 } DriverHandle;
 
 /*
- * Stores three headers used to identify the kind of input uris 
- * (e.g. file or buffer/memory) and the number of parameters being
- * supplied (arity).
+ * Identifies the kind of input uris (e.g. file or buffer/memory)
+ * and the number of parameters being supplied.
  */
 typedef struct {
-  /* The position in which we're expecting the input kind value. */
   UInt8 input_kind;
-  /* The position in which we're expecting the xsl input kind value. */
   UInt8 xsl_kind;
-  /*
-   * The position in which we're expecting a value
-   * denoting the number of parameters being supplied.
-   */
   UInt16 param_grp_arity;
-} InputSpecHeaders;
+} InputSpec;
 
 /*
- * Headers that specify the data size for the payload (i.e. the size
- * of the input and stylesheet buffers).
+ * Specifies the data size(s) for the payload.
  */
 typedef struct  {
-  /* The position in which we're expecting the input size marker value */
   UInt32 input_size;
-  /* The position in which we're expecting the xsl size marker value */
   UInt32 xsl_size;
-} PayloadSizeHeaders;
+} PayloadSize;
 
 /*
- * Contains a structural outline of a single argument within the 
+ * Contains a structural outline of a single argument within the
  * request buffer, specifying the size of the argument name and value buffers.
  */
 typedef struct request_buffer_argument_outline {
@@ -116,14 +106,14 @@ typedef struct request_buffer_argument_outline {
   UInt16  value_size;
 } ParameterSpecHeaders;
 
-/* Used as a handle during async processing */ 
+/* Used as a handle during async processing */
 typedef struct {
   /* Holds the state of the XslEngine post processing. */
   EngineState state;
   /* Holds the DriverHandle. */
   DriverHandle* driver;
   /* Holds the command being processed. */
-  Command* command; 
+  Command* command;
 } AsyncState;
 
 // entry point in the provider engine shared object library
@@ -162,20 +152,20 @@ static void free_task(XslTask*);
 static void free_command(Command *cmd);
 /* Free all memory associated with the supplied AsyncState (including all referenced data). */
 static void free_async_state(AsyncState*);
-/* Allocate and initialize a DriverIOVec structure with the supplied 
+/* Allocate and initialize a DriverIOVec structure with the supplied
    arguments (presets all fields appropriately). Returns NULL on failure. */
 static DriverIOVec* init_iov(DataFormat, Int32, void*);
-/* Allocate and initialize an InputDocument structure with the supplied 
+/* Allocate and initialize an InputDocument structure with the supplied
    arguments (presets all fields appropriately). Returns NULL on failure. */
 static InputDocument* init_doc(InputType, Int32, char*);
-/* Initialize the supplied XslTask structure with the supplied arguments 
+/* Initialize the supplied XslTask structure with the supplied arguments
    (presets all fields appropriately). Returns the appropriate DriverState to indicate the result. */
-static DriverState 
-init_task(XslTask*, 
-          const PayloadSizeHeaders* const, 
-          const InputSpecHeaders* const, 
+static DriverState
+init_task(XslTask*,
+          const PayloadSize* const,
+          const InputSpec* const,
           char*, char*);
-/* Allocate and initialize a Command structure with the supplied arguments 
+/* Allocate and initialize a Command structure with the supplied arguments
    (presets all fields appropriately). Returns NULL on failure. */
 static Command* init_command(const char*, DriverContext*, XslTask*, DriverIOVec*);
 static char *libload_failure = "Unable to load xslt provider library.";
@@ -189,27 +179,27 @@ char *entrypoint_failure = "Unable to locate entry point 'init_engine'.";
 
 /* INTERNAL DRIVER FUNCTIONS */
 
-/* Tries to allocate heap space of 'size'. If this fails, the pointers 
-   in the varags array are freed one by one and the program fails. */ 
+/* Tries to allocate heap space of 'size'. If this fails, the pointers
+   in the varags array are freed one by one and the program fails. */
 static void* try_driver_alloc(void *port, size_t size, void* pfree, ...) {
   void* val = ALLOC(size);
   if (val == NULL) {
     va_list ap;
     void* p;
 
-    va_start(ap, pfree); 
+    va_start(ap, pfree);
     while ((p = va_arg(ap, void*)) != NULL) {
 		  DRV_FREE(p);
     }
     va_end(ap);
 
-    FAIL(port, "system_limit"); 
+    FAIL(port, "system_limit");
   }
   return val;
 };
 
 #ifdef WIN32
-static void* 
+static void*
 dlsym(void *mod, const char *func) {
   HMODULE lib = (HMODULE)mod;
   void *funcp = (void*)GetProcAddress(lib, func);
@@ -232,7 +222,7 @@ set_dlerror(LoaderSpec *dest, char *message) {
   dest->error_message = dlerror();
   if (dest->error_message == NULL) {
     sprintf(dest->error_message, message, dest->name);
-  } 
+  }
 #endif
 };
 
@@ -249,13 +239,13 @@ static void *_dlopen(const char *file) {
 static void
 load_library(LoaderSpec *dest) {
   if (dest == NULL) return;
-  
+
   if ((dest->library = _dlopen((const char*)dest->name)) == NULL) {
     set_dlerror(dest, libload_failure);
     DBG("dlopen failed with %s\n", dest->error_message);
     return;
   }
-  
+
   DBG("library %s = %p\n", dest->name, dest->library);
 
   if ((dest->init_f = dlsym(dest->library, init_entry_point)) == NULL) {
@@ -263,17 +253,17 @@ load_library(LoaderSpec *dest) {
   }
 };
 
-static DriverState 
+static DriverState
 init_provider(DriverHandle *drv, char *buff) {
   XslEngine *engine = ALLOC(sizeof(XslEngine));
   LoaderSpec* lib = ALLOC(sizeof(LoaderSpec));
-    
+
   if (engine == NULL || lib == NULL) {
     DRV_FREE(engine);
     DRV_FREE(lib);
     return OutOfMemory;
   }
-  
+
   drv->loader = lib;
   lib->name = ALLOC(strlen(buff));
   strcpy(lib->name, buff);
@@ -281,20 +271,20 @@ init_provider(DriverHandle *drv, char *buff) {
 
   if (lib->library == NULL) {
     // TODO: better reporting back to the port controller!?
-    puts(lib->error_message);    
+    puts(lib->error_message);
     return LibraryNotFound;
   }
   if (lib->init_f == NULL) {
     // TODO: better reporting back to the port controller!?
     puts(lib->error_message);
-    return EntryPointNotFound; 
+    return EntryPointNotFound;
   }
-    
+
   (lib->init_f)(engine);
   if (engine == NULL) {
     return InitFailed;
   }
-  
+
   drv->engine = engine;
   return InitOk;
 };
@@ -347,7 +337,7 @@ free_document(InputDocument *doc) {
   }
 };
 
-static void 
+static void
 free_task(XslTask *task) {
   if (task != NULL) {
     free_parameters(task->parameters);
@@ -370,7 +360,7 @@ free_command(Command *cmd) {
   }
 };
 
-static void 
+static void
 free_async_state(AsyncState *state) {
   ASSERT(state != NULL);
   if (state != NULL) {
@@ -380,13 +370,13 @@ free_async_state(AsyncState *state) {
 };
 
 static DriverIOVec*
-init_iov(DataFormat type, 
-         Int32 size, 
+init_iov(DataFormat type,
+         Int32 size,
          void *payload) {
-  
+
   DriverIOVec *iov = ALLOC(sizeof(DriverIOVec));
   if (iov == NULL) return NULL;
-  
+
   iov->dirty = (payload == NULL) ? 0 : 1;
   iov->type = type;
   iov->size = size;
@@ -399,13 +389,13 @@ init_iov(DataFormat type,
 };
 
 static InputDocument*
-init_doc(InputType type, 
-         Int32 size, 
+init_doc(InputType type,
+         Int32 size,
          char *data) {
-  
+
   InputDocument *doc = ALLOC(sizeof(InputDocument));
   if (doc == NULL) return NULL;
-  
+
   doc->type = type;
   if ((doc->iov = init_iov(Text, size, (void*)data)) == NULL) {
     DRV_FREE(doc);
@@ -419,72 +409,72 @@ static void clear_task_fields(XslTask* t) {
   t->parameters = NULL;
 };
 
-static DriverState 
-init_task(XslTask *task, 
-          const PayloadSizeHeaders* const hsize, 
-          const InputSpecHeaders* const hspec, 
-          char* xml, 
+static DriverState
+init_task(XslTask *task,
+          const PayloadSize* const hsize,
+          const InputSpec* const hspec,
+          char* xml,
           char* xsl) {
-  
+
   if (task == NULL) {
     return BadArgumentError;
   }
   clear_task_fields(task);
-  
+
   if (hsize == NULL || hspec == NULL || xml == NULL || xsl == NULL) {
     return BadArgumentError;
   }
-  
+
   if (hsize->input_size == 0 || hsize->xsl_size == 0) {
     return EmptyBufferError;
   }
-  
+
   ASSERT(hsize->input_size == strlen(xml));
   ASSERT(hsize->xsl_size == strlen(xsl));
-  
+
   InputDocument *xmldoc;
   InputDocument *xsldoc;
-  
-  if ((xmldoc = init_doc((InputType)hspec->input_kind, 
+
+  if ((xmldoc = init_doc((InputType)hspec->input_kind,
       hsize->input_size, xml)) == NULL) {
     DRV_FREE(xml);
-    DRV_FREE(xsl);  
+    DRV_FREE(xsl);
     return OutOfMemoryError;
   }
-      
-  if ((xsldoc = init_doc((InputType)hspec->xsl_kind, 
-      hsize->xsl_size, xsl)) == NULL) {  
+
+  if ((xsldoc = init_doc((InputType)hspec->xsl_kind,
+      hsize->xsl_size, xsl)) == NULL) {
     free_document(xmldoc);
     DRV_FREE(xml);
     DRV_FREE(xsl);
-    return OutOfMemoryError;  
+    return OutOfMemoryError;
   }
-  
+
   task->input_doc = xmldoc;
   task->xslt_doc = xsldoc;
   task->parameters = NULL;
   return Success;
 };
 
-static void* 
+static void*
 internal_alloc(size_t size) {
   return ALLOC(size);
 };
 
-static void 
+static void
 internal_free(void *p) {
   DRV_FREE(p);
 };
 
-static void* 
+static void*
 internal_realloc(void *ptr, size_t size) {
   return REALLOC(ptr, size);
 };
 
 static Command*
 init_command(const char *command, DriverContext *context, XslTask *xsl_task, DriverIOVec *iov) {
-  Command *cmd; 
-  if ((cmd = ALLOC(sizeof(Command))) == NULL) return NULL;  
+  Command *cmd;
+  if ((cmd = ALLOC(sizeof(Command))) == NULL) return NULL;
   if ((cmd->result = init_iov(Text, 0, NULL)) == NULL) {
     return NULL;
   }

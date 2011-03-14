@@ -161,7 +161,7 @@ describe "Initializing XslTask Structures"
     state should be BadArgumentError;
   end
 
-  it "should fail for NULL PayloadSizeHeaders"
+  it "should fail for NULL PayloadSize"
     DriverState state;    
     XslTask *task = ALLOC(sizeof(XslTask));
     state = init_task(task, NULL, NULL, NULL, NULL);
@@ -171,10 +171,10 @@ describe "Initializing XslTask Structures"
   
   it "should fail for NULL InputSpecHeaders"
     DriverState state;    
-    PayloadSizeHeaders hsize;
+    PayloadSize hsize;
     XslTask *task = ALLOC(sizeof(XslTask));
     state = init_task(task, 
-            (const PayloadSizeHeaders* const)&hsize,
+            (const PayloadSize* const)&hsize,
             NULL, NULL, NULL);
     state should be BadArgumentError;
     free_task(task);
@@ -182,11 +182,11 @@ describe "Initializing XslTask Structures"
   
   it "should fail for NULL xml buffers"
     DriverState state;    
-    PayloadSizeHeaders hsize;
+    PayloadSize hsize;
     InputSpecHeaders hspec;    
     XslTask *task = ALLOC(sizeof(XslTask));
     state = init_task(task, 
-            (const PayloadSizeHeaders* const)&hsize,
+            (const PayloadSize* const)&hsize,
             (const InputSpecHeaders* const)&hspec, 
             NULL, NULL);
     state should be BadArgumentError;
@@ -195,13 +195,13 @@ describe "Initializing XslTask Structures"
   
   it "should fail for NULL xsl buffers"
     DriverState state;    
-    PayloadSizeHeaders hsize;
+    PayloadSize hsize;
     InputSpecHeaders hspec;    
     XslTask *task = ALLOC(sizeof(XslTask));
     create_test_data(test_xml, input_doc);
         
     state = init_task(task, 
-            (const PayloadSizeHeaders* const)&hsize,
+            (const PayloadSize* const)&hsize,
             (const InputSpecHeaders* const)&hspec, 
             test_xml, NULL);
     state should be BadArgumentError;
@@ -210,7 +210,7 @@ describe "Initializing XslTask Structures"
   
   it "should fail for empty input sizes"
     DriverState state;    
-    PayloadSizeHeaders hsize;
+    PayloadSize hsize;
     InputSpecHeaders hspec;    
     XslTask *task = ALLOC(sizeof(XslTask));
     create_test_data(test_xml, input_doc);
@@ -219,7 +219,7 @@ describe "Initializing XslTask Structures"
     hsize.input_size = 0;
 
     state = init_task(task, 
-            (const PayloadSizeHeaders* const)&hsize,
+            (const PayloadSize* const)&hsize,
             (const InputSpecHeaders* const)&hspec, 
             test_xml, test_xsl);
     state should be EmptyBufferError;
@@ -228,7 +228,7 @@ describe "Initializing XslTask Structures"
   
   it "should fail for empty input sizes"
     DriverState state;    
-    PayloadSizeHeaders hsize;
+    PayloadSize hsize;
     InputSpecHeaders hspec;    
     XslTask *task = ALLOC(sizeof(XslTask));
     create_test_data(test_xml, input_doc);
@@ -237,7 +237,7 @@ describe "Initializing XslTask Structures"
     hsize.input_size = 0;
 
     state = init_task(task, 
-            (const PayloadSizeHeaders* const)&hsize,
+            (const PayloadSize* const)&hsize,
             (const InputSpecHeaders* const)&hspec, 
             test_xml, test_xsl);
     state should be EmptyBufferError;
@@ -246,7 +246,7 @@ describe "Initializing XslTask Structures"
   
   it "should fail for empty xslt sizes"
     DriverState state;    
-    PayloadSizeHeaders hsize;
+    PayloadSize hsize;
     InputSpecHeaders hspec;    
     XslTask *task = ALLOC(sizeof(XslTask));
     create_test_data(test_xml, input_doc);
@@ -256,7 +256,7 @@ describe "Initializing XslTask Structures"
     hsize.xsl_size = 0;
 
     state = init_task(task, 
-            (const PayloadSizeHeaders* const)&hsize,
+            (const PayloadSize* const)&hsize,
             (const InputSpecHeaders* const)&hspec, 
             test_xml, test_xsl);
     state should be EmptyBufferError;
@@ -265,7 +265,7 @@ describe "Initializing XslTask Structures"
 
   it "should (fail) assertion for non-matching [input] buffer vs. header size"
     DriverState state;    
-    PayloadSizeHeaders hsize;
+    PayloadSize hsize;
     InputSpecHeaders hspec;    
     XslTask *task = ALLOC(sizeof(XslTask));
     create_test_data(test_xml, input_doc);
@@ -275,7 +275,7 @@ describe "Initializing XslTask Structures"
     hsize.xsl_size = strlen(test_xsl);
 
     state = init_task(task, 
-            (const PayloadSizeHeaders* const)&hsize,
+            (const PayloadSize* const)&hsize,
             (const InputSpecHeaders* const)&hspec, 
             test_xml, test_xsl);
     
@@ -289,7 +289,7 @@ describe "Initializing XslTask Structures"
   
   it "should (fail) assertion for non-matching [xsl] buffer vs. header size"
     DriverState state;    
-    PayloadSizeHeaders hsize;
+    PayloadSize hsize;
     InputSpecHeaders hspec;    
     XslTask *task = ALLOC(sizeof(XslTask));
     create_test_data(test_xml, input_doc);
@@ -299,7 +299,7 @@ describe "Initializing XslTask Structures"
     hsize.xsl_size = 3;
 
     state = init_task(task, 
-            (const PayloadSizeHeaders* const)&hsize,
+            (const PayloadSize* const)&hsize,
             (const InputSpecHeaders* const)&hspec, 
             test_xml, test_xsl);
 
@@ -311,7 +311,7 @@ describe "Initializing XslTask Structures"
   end  
 
   it "should fail when no memory is available to allocate InputDocument(s)"
-    PayloadSizeHeaders hsize;
+    PayloadSize hsize;
     InputSpecHeaders hspec;
 
     create_test_data(test_xml, input_doc);
@@ -323,7 +323,7 @@ describe "Initializing XslTask Structures"
     DriverState state; 
     do_with_nomem(
       state = init_task(task, 
-        (const PayloadSizeHeaders* const)&hsize, 
+        (const PayloadSize* const)&hsize, 
         (const InputSpecHeaders* const)&hspec,
         test_xml, test_xsl));
 
@@ -332,7 +332,7 @@ describe "Initializing XslTask Structures"
   end
 
   it "should set the input type to text and size the DriverIOVec appropriately"
-    PayloadSizeHeaders hsize;
+    PayloadSize hsize;
     InputSpecHeaders hspec;
     
     create_test_data(test_xml, input_doc);
@@ -342,7 +342,7 @@ describe "Initializing XslTask Structures"
     
     XslTask *task = ALLOC(sizeof(XslTask)); 
     DriverState state = init_task(task, 
-      (const PayloadSizeHeaders* const)&hsize, 
+      (const PayloadSize* const)&hsize, 
       (const InputSpecHeaders* const)&hspec,
       test_xml, test_xsl);
     

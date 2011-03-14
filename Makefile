@@ -29,7 +29,7 @@ dialyzer: compile
 	@(dialyzer -Wno_return -c apps/riak_core/ebin)
 
 test: compile pretest ct
-	make -C inttest test
+	#make -C inttest test
 
 ct:
 	@(env ERL_LIBS=$$ERL_LIBS LD_LIBRARY_PATH=./priv:./priv/test/bin:$$LD_LIBRARY_PATH rebar $$VERBOSE ct skip_deps=true)
