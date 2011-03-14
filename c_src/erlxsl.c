@@ -211,18 +211,28 @@ read_ev(const ErlIOVec *ev, int iov_idx, int *buffer_size) {
   SysIOVec iov = ev->iov[iov_idx];
   ErlDrvBinary* binv = ev->binv[iov_idx];
 
-  if (binv == NULL) {
-    size = iov.iov_len + 1;
+  if (binv == NULL || binv->orig_size <= 64) {
+    INFO("Reading from iov\n");
+    size = iov.iov_len;
     source = &iov.iov_base[0];
   } else {
-    size = binv->orig_size + 1;
+    INFO("Reading from binv\n");
+    size = binv->orig_size;
     source = &binv->orig_bytes[0];
   }
-  if ((buffer = ALLOC(size)) == NULL) {
+  if ((buffer = ALLOC(size + 1)) == NULL) {
     return NULL;
   }
+  INFO("---------------------------------------\n");
+  INFO("Allocated buffer (size = %i)\n", size);
   *buffer_size = size;
-  return strncpy(buffer, source, size);
+  strncpy(buffer, source, size);
+  INFO("---------------------------------------\n");
+  INFO("BUFFER_START:\n");
+  INFO("%s", buffer);
+  INFO("BUFFER_END;\n")
+  INFO("---------------------------------------\n");
+  return buffer;
 }
 
 /*
@@ -256,6 +266,7 @@ outputv(ErlDrvData drv_data, ErlIOVec *ev) {
   int xsl_size = 0;
 
   if (ev->vsize < VSIZE) {
+    INFO("ev->vsize = %i\n", ev->vsize);
     error_msg = "InconsistentInputVector: driver protocol not recognised.";
     driver_output2(port, error_msg, strlen(error_msg), NULL, 0);
     return;
@@ -288,7 +299,7 @@ outputv(ErlDrvData drv_data, ErlIOVec *ev) {
     FAIL(port, "system_limit");
     return;
   }
-  hsize->xsl_size = (UInt32)xml_size;
+  hsize->xsl_size = (UInt32)xsl_size;
 
   if ((job = (XslTask*)try_driver_alloc(port,
     sizeof(XslTask), xml, xsl, hsize, hspec)) == NULL) return;
@@ -307,7 +318,7 @@ outputv(ErlDrvData drv_data, ErlIOVec *ev) {
   }
 
   fprintf(stderr, "xml = %s\n", xml);
-  fprintf(stderr, "xsl = %s\n", xsl);
+  fprintf(stderr, "xsl (len %i) = %s (len %i)\n", hsize->xsl_size, xsl, strlen(xsl));
 
   state = init_task(job, hsize, hspec, xml, xsl);
   switch (state) {

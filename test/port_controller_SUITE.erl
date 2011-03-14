@@ -45,8 +45,8 @@
 % public api exports
 
 % automatically registers all exported functions as test cases
-all() -> [].
-    %% ?EXPORT_TESTS(?MODULE).
+all() ->
+    ?EXPORT_TESTS(?MODULE).
 
 init_per_suite(C) ->
   BaseDir  = filename:rootname(filename:dirname(filename:absname(code:which(?MODULE))), "test"),
@@ -75,8 +75,10 @@ init_per_suite(C) ->
 end_per_suite(_) ->
   erlxsl_app:stop().
 
-driver_startup(_) ->
-  X = erlxsl_port_controller:transform(<<"<input_data />">>, <<"<output />">>),
+driver_startup(Config) ->
+  {ok, Foo} = file:read_file(filename:join(?config(data_dir, Config), "foo.xml")),
+  ct:pal("Foo = ~p~n", [Foo]),
+  X = erlxsl_port_controller:transform(Foo, <<"<output />">>),
   ct:pal("X = ~p~n", [X]),
-  ?assertThat(X, equal_to(<<"<input_data /><output />">>)).
+  ?assertThat(binary_to_list(X), equal_to(binary_to_list(Foo) ++ binary_to_list(<<"<output />">>))).
 

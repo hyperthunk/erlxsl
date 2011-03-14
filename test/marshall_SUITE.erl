@@ -63,7 +63,7 @@ parameterised_request_becomes_nested_iolist(_) ->
   Xsl = <<"<?xml version='1.0'?>">>,
   Parameters = [ {<<"p1">>, <<"value1">>}, {<<"p2">>, <<"value2">>} ],
   ?assertMatch(
-    [[_, _], [Xml, Xsl],
+    [[1, 1], [Xml, Xsl],
      [[<<"p1">>, <<"value1">>],
       [<<"p2">>, <<"value2">>]]],
     erlxsl_marshall:pack(?FILE_INPUT, ?FILE_INPUT, Xml, Xsl, Parameters)),

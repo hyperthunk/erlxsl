@@ -23,8 +23,7 @@
 %% THE SOFTWARE.
 %% -----------------------------------------------------------------------------
 
--define(FILE_INPUT,   <<1:8/native-integer>>).
--define(BUFFER_INPUT, <<2:8/native-integer>>).
--define(STREAM_INPUT, <<3:8/native-integer>>).
+-define(BUFFER_INPUT, buffer).
+-define(FILE_INPUT,   file).
 
 -type(proplist() :: [{atom(), term()}]).

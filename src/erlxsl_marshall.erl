@@ -31,8 +31,6 @@
 
 -include("erlxsl.hrl").
 
--import(lists, [map/2]).
-
 %% Public API Exports
 -export([pack/4, pack/5]).
 
@@ -50,12 +48,12 @@ when is_binary(Input) andalso is_binary(Xsl) ->
 %% to a linked-in port driver.
 -spec(pack(InputType::atom(), XslType::atom(),
            Input::binary(), Xsl::binary(), [{binary(), binary()}]) -> iolist()).
-pack(InputType, XslType, Input, Xsl, [])
-when is_binary(InputType) andalso is_binary(XslType) ->
-  [[size(Input), size(Xsl)], [ Input, Xsl ]];
-pack(InputType, XslType, Input, Xsl, Parameters)
-when is_binary(InputType) andalso is_binary(XslType) ->
-  ParamLen = length(Parameters),
-  [[size(Input), size(Xsl)],
+pack(InputType, XslType, Input, Xsl, []) ->
+  [[pack(InputType), pack(XslType)], [Input, Xsl]];
+pack(InputType, XslType, Input, Xsl, Parameters) ->
+  [[pack(InputType), pack(XslType)],
    [Input, Xsl],
    [[Name, Value] || {Name, Value} <- Parameters]].
+
+pack(?BUFFER_INPUT) -> 0;
+pack(?FILE_INPUT) -> 1.
