@@ -28,8 +28,6 @@
  * test in isolation from the port controller and other associated machinery. 
  */
 
-#include "erlxsl.h"
-#include "erlxsl_port.h"
 #include <stdio.h>
 
 int main(void) {

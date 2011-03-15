@@ -146,17 +146,21 @@ init_path() ->
 
 init_driver(#state{driver=Driver, load_path=BinPath}=State) ->
   erl_ddll:start(),
+  {ok, Cwd} = file:get_cwd(),
   % load driver
-  ct:pal("loading driver ~p~n", [Driver]),
+  erlxsl_fast_log:debug("loading d:~p, p:~p env:~p~n",
+    [Driver, BinPath, Cwd]),
   init_lib(erl_ddll:load_driver(BinPath, Driver), State).
 
 init_lib({error, Error}, _) ->
   {stop, {Error, erl_ddll:format_error(Error)}};
 init_lib(ok, #state{ driver=Driver }=State) ->
+  erlxsl_fast_log:debug("opening port to ~p~n", [Driver]),
   Port = open_port({spawn, Driver}, [binary]),
   init_port(State#state{ port=Port }).
 
 init_port(#state{ port=Port, engine=Engine }=State) when is_list(Engine) ->
+  erlxsl_fast_log:debug("configuring driver with ~p~n", [Engine]),
   try (erlang:port_call(Port, 9, Engine)) of
     configured -> {ok, State};
     Other -> {stop, {unexpected_driver_state, Other}}

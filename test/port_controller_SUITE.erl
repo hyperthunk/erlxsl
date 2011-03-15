@@ -58,7 +58,9 @@ init_per_suite(C) ->
   {driver_options, Opts} = lists:keyfind(driver_options, 1, Env),
   UpdatedOpts =
   case erlxsl_util:os_platform() of
-    darwin -> lists:keyreplace(load_path, 1, Opts, {load_path, PrivDir});
+    %% FIXME: horrible - do this some other way (like switching on win32 and defaulting for *nix)
+    Atom when Atom =:= darwin orelse Atom =:= linux ->
+      lists:keyreplace(load_path, 1, Opts, {load_path, PrivDir});
     _ -> Opts
   end,
   Lib = proplists:get_value(engine, UpdatedOpts),
@@ -81,4 +83,3 @@ driver_startup(Config) ->
   X = erlxsl_port_controller:transform(Foo, <<"<output />">>),
   ct:pal("X = ~p~n", [X]),
   ?assertThat(binary_to_list(X), equal_to(binary_to_list(Foo) ++ binary_to_list(<<"<output />">>))).
-
