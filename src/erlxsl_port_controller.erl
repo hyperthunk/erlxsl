@@ -52,7 +52,7 @@
   engine        :: string(),
   driver        :: string(),
   load_path     :: string(),
-  clients       :: [{pid(), pid()}]
+  clients = []  :: [{pid(), pid()}]   %% TODO: consider ets instead of in-proc state...
 }).
 
 %% public api
@@ -61,7 +61,6 @@ start() ->
   start(application:get_all_env(erlxsl)).
 
 %% @doc starts erlxsl_port_server with default options.
-%% NB: this means that the XSLT provider will be a test stub!
 start(Config) ->
   gen_server:start({local,?SERVER}, ?SERVER, Config, []).
 
@@ -69,13 +68,14 @@ start_link() ->
   start_link(application:get_all_env(erlxsl)).
 
 %% @doc starts erlxsl_port_server with default options.
-%% NB: this means that the XSLT provider will be a test stub!
 start_link(Config) ->
   gen_server:start_link({local,?SERVER}, ?SERVER, Config, []).
 
 stop() ->
   gen_server:cast(?SERVER, stop).
 
+%% TODO: document the API
+%% TODO: add type specs for the API
 transform(Input, Xsl) ->
   processing = gen_server:call(?SERVER, {transform, Input, Xsl}),
   receive
@@ -188,7 +188,7 @@ init_lib(ok, #state{ driver=Driver }=State) ->
 
 init_port(#state{ port=Port, engine=Engine }=State) when is_list(Engine) ->
   erlxsl_fast_log:debug("configuring driver with ~p~n", [Engine]),
-  try (erlang:port_call(Port, 9, Engine)) of
+  try (erlang:port_call(Port, ?PORT_INIT, Engine)) of
     configured -> {ok, State};
     Other -> {stop, {unexpected_driver_state, Other}}
   catch
