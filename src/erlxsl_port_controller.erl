@@ -81,6 +81,8 @@ transform(Input, Xsl) ->
   receive
     {_Ref, {result,_,Result}} ->
       Result;
+    {_Ref, {error, Error}=Err} ->
+      Err;
     {data, Data} ->
       {error, Data};
     Other -> Other
@@ -105,7 +107,6 @@ handle_call({transform, Input, Stylesheet}, From,
             #state{ logger=Log, clients=CL }=State) ->
   WorkerPid = handle_transform(?BUFFER_INPUT, ?BUFFER_INPUT, Input,
                                Stylesheet, State, From),
-  Log:debug("storing ~p for worker ~p~n", [From, WorkerPid]),
   NewState = State#state{ clients=[{WorkerPid, From}|CL] },
   start_worker(WorkerPid),
   {reply, processing, NewState};
@@ -147,7 +148,7 @@ handle_transform(InType, XslType, Input, Stylesheet,
   spawn_link(
     fun() ->
       %% TODO: find a neater way of doing this 'pause until ready' thing
-      Log:debug("Waiting for start command..."),
+      Log:debug("Waiting for start command...~n"),
       receive start ->
         port_command(Port, erlxsl_marshall:pack(InType, XslType,
                                                 Input, Stylesheet)),

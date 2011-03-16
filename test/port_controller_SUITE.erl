@@ -86,8 +86,10 @@ basic_transform(Config) ->
   ?assertThat(binary_to_list(X), equal_to(ExpectedResult)).
 
 bad_args_transform(Config) ->
-  erlxsl_port_controller:transform(bad, args),
-  ok.
+  X = erlxsl_port_controller:transform(bad, args),
+  ?assertMatch({error, {function_clause,
+               [{erlxsl_marshall,pack,[buffer,buffer,bad,args]},
+                {erlxsl_port_controller, _, _}]}}, X).
 
 transform_small_binaries(_) ->
   Foo = <<"<input />">>,
