@@ -1,6 +1,6 @@
 /*
  * so_loading.spec
- * 
+ *
  * -----------------------------------------------------------------------------
  * Copyright (c) 2008-2010 Tim Watson (watson.timothy@gmail.com)
  *
@@ -23,14 +23,14 @@
  * THE SOFTWARE.
  * -----------------------------------------------------------------------------
  * Notes: If you're looking at a version of this file with the extension .c then
- * you're looking at generated code. For the original test specifications, 
+ * you're looking at generated code. For the original test specifications,
  * please look at the file with the .spec extension instead.
  */
 
 #include "cspec.h"
 #include "spec_includes.h"
 #include "ei_test.h"
-#include "erlxsl_ei.h"
+#include "erlxsl_ei.c"
 
 describe "Decoding Buffers using EI"
 
@@ -39,7 +39,7 @@ describe "Decoding Buffers using EI"
     int index = 0;
     Command *cmd = ALLOC(sizeof(Command));
     DriverState state;
-    
+
     with_ei_fail(state = decode_ei_cmd(cmd, buf, &index));
     state should be DecodeError;
     free_command(cmd);
@@ -50,7 +50,7 @@ describe "Decoding Buffers using EI"
     int index = 0;
     Command *cmd = ALLOC(sizeof(Command));
     DriverState state;
-    
+
     with_type(ERL_FUN_EXT, state = decode_ei_cmd(cmd, buf, &index));
     state should be DecodeError;
     free_command(cmd);
@@ -62,8 +62,8 @@ describe "Decoding Buffers using EI"
     int tuple_size = 2;
     Command *cmd = ALLOC(sizeof(Command));
     DriverState state;
-    
-    with_tuple(tuple_size, 
+
+    with_tuple(tuple_size,
       do_with_nomem(state = decode_ei_cmd(cmd, buf, &index))
     );
     state should be OutOfMemory;

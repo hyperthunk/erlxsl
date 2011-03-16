@@ -1,6 +1,6 @@
 /*
  * erlxsl_driver.h
- * 
+ *
  * -----------------------------------------------------------------------------
  * Copyright (c) 2008-2010 Tim Watson (watson.timothy@gmail.com)
  *
@@ -22,10 +22,10 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  * -----------------------------------------------------------------------------
- * Notes: 
- * 
+ * Notes:
+ *
  * This header contains code specific to the shared object library used by the
- * linked-in driver. It depends on erl_driver and ei. This header *must* be 
+ * linked-in driver. It depends on erl_driver and ei. This header *must* be
  * included before the erlxsl_internal header.
  *
  */

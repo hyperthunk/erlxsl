@@ -45,8 +45,8 @@
 % public api exports
 
 % automatically registers all exported functions as test cases
-all() ->
-    ?EXPORT_TESTS(?MODULE).
+all() -> [basic_transform].
+   %% ?EXPORT_TESTS(?MODULE).
 
 init_per_suite(C) ->
   BaseDir  = filename:rootname(filename:dirname(filename:absname(code:which(?MODULE))), "test"),
@@ -77,9 +77,17 @@ init_per_suite(C) ->
 end_per_suite(_) ->
   erlxsl_app:stop().
 
-driver_startup(Config) ->
+basic_transform(Config) ->
   {ok, Foo} = file:read_file(filename:join(?config(data_dir, Config), "foo.xml")),
+  ct:pal("Foo = ~p~n", [Foo]),
+  X = erlxsl_port_controller:transform(Foo, <<"<output name='foo' age='21'/>">>),
+  ct:pal("X = ~p~n", [X]),
+  ExpectedResult = binary_to_list(Foo) ++ binary_to_list(<<"<output name='foo' age='21'/>">>),
+  ?assertThat(binary_to_list(X), equal_to(ExpectedResult)).
+
+transform_small_binaries(_) ->
+  Foo = <<"<input />">>,
   ct:pal("Foo = ~p~n", [Foo]),
   X = erlxsl_port_controller:transform(Foo, <<"<output />">>),
   ct:pal("X = ~p~n", [X]),
-  ?assertThat(binary_to_list(X), equal_to(binary_to_list(Foo) ++ binary_to_list(<<"<output />">>))).
+  ?assertThat(binary_to_list(X), equal_to(<<"<input /><output />">>)).

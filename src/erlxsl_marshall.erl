@@ -43,6 +43,9 @@ pack(InputType, XslType, Input, Xsl)
 when is_binary(Input) andalso is_binary(Xsl) ->
   pack(InputType, XslType, Input, Xsl, []).
 
+%% FIXME: "heap allocated" binaries are passed as list data!
+%% maybe plonk an empty 'separator' between entries? - ugly but simple
+
 %% @doc Packs the input and xsl type metadata, instance data and the
 %% supplied proplist of parameters into an iolist, for submission
 %% to a linked-in port driver.

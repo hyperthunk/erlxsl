@@ -99,6 +99,7 @@ handle_call(_Msg, _From, State) ->
   {noreply, State}.
 
 handle_cast({transform, Input, Stylesheet, Sender}, #state{logger=Log}=State) ->
+  %% TODO: move this into handle_call use gen_server:reply once the driver responds
   Log:info("handle_cast sender = ~p~n", [Sender]),
   handle_transform(?BUFFER_INPUT, ?BUFFER_INPUT,
     Input, Stylesheet, State, Sender),
@@ -123,6 +124,7 @@ code_change(_OldVsn, State, _Extra) ->
 
 handle_transform(InType, XslType, Input, Stylesheet, #state{ port=Port }, Sender) ->
   %% TODO: don't ignore errors, don't let it potentially hang for ever, etc.....
+  %% TODO: move this into the handle_info callback and use gen_server:reply
   spawn(
     fun() ->
       port_command(Port, erlxsl_marshall:pack(InType, XslType, Input, Stylesheet)),

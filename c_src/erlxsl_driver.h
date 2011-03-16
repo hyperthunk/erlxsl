@@ -1,6 +1,6 @@
 /*
  * erlxsl_driver.h
- * 
+ *
  * -----------------------------------------------------------------------------
  * Copyright (c) 2008-2010 Tim Watson (watson.timothy@gmail.com)
  *
@@ -22,10 +22,10 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  * -----------------------------------------------------------------------------
- * Notes: 
- * 
+ * Notes:
+ *
  * This header contains code specific to the shared object library used by the
- * linked-in driver. It depends on erl_driver and ei. This header *must* be 
+ * linked-in driver. It depends on erl_driver and ei. This header *must* be
  * included before the erlxsl_internal header.
  *
  */
@@ -34,11 +34,10 @@
 #define  _ERLXSL_DRV_H
 
 #include <erl_driver.h>
-#include <ei.h>
 
 /* INTERNAL DATA & DATA STRUCTURES */
 
-static ErlDrvTermData atom_result; 
+static ErlDrvTermData atom_result;
 static ErlDrvTermData atom_error;
 static ErlDrvTermData atom_log;
 
@@ -102,7 +101,7 @@ create_driver_output(DriverHandle *drv, ErlDrvTermData *tag, DriverIOVec *outv, 
   default:
     term = NULL;
   }
-  
+
   return term;
 };
 
@@ -112,7 +111,7 @@ make_two_tag_tuple(ErlDrvPort *port, DrvTaggedData *payload, ErlDrvTermData *tag
   ErlDrvTermData  spec[9];
   term = ALLOC(sizeof(spec));
   if (term == NULL) return NULL;
-  
+
   spec[0] = ERL_DRV_ATOM;
   spec[1] = *tag;
   spec[2] = ERL_DRV_ATOM;
@@ -120,52 +119,52 @@ make_two_tag_tuple(ErlDrvPort *port, DrvTaggedData *payload, ErlDrvTermData *tag
   spec[4] = ERL_DRV_BUF2BINARY;
   spec[5] = payload->data;
   spec[6] = strlen(payload->data);
-  spec[7] = ERL_DRV_TUPLE; 
+  spec[7] = ERL_DRV_TUPLE;
   spec[8] = 3;
-  
+
   memcpy(term, &spec, sizeof(spec));
   *length = sizeof(spec) / sizeof(spec[0]);
   return term;
 };
 */
 
-static ErlDrvTermData* 
+static ErlDrvTermData*
 make_driver_term_bin(ErlDrvPort *port, ErlDrvBinary *payload, ErlDrvTermData *tag, long *length) {
   ErlDrvTermData *term;
   ErlDrvTermData  spec[10];
   term = ALLOC(sizeof(spec));
   if (term == NULL) return NULL;
-  
+
   spec[0] = ERL_DRV_ATOM;
   spec[1] = *tag;
   spec[2] = ERL_DRV_PORT;
   spec[3] = driver_mk_port(*port);
-  spec[4] = ERL_DRV_BINARY; 
-  spec[5] = (ErlDrvTermData)payload; 
+  spec[4] = ERL_DRV_BINARY;
+  spec[5] = (ErlDrvTermData)payload;
   spec[6] = ERL_DRV_UINT;
   spec[7] = payload->orig_size;
-  spec[8] = ERL_DRV_TUPLE; 
+  spec[8] = ERL_DRV_TUPLE;
   spec[9] = 3;
-  
+
   memcpy(term, &spec, sizeof(spec));
   *length = sizeof(spec) / sizeof(spec[0]);
-  return term;  
+  return term;
 };
 
-static ErlDrvTermData* 
+static ErlDrvTermData*
 make_driver_term(ErlDrvPort *port, char *payload, ErlDrvTermData *tag, long *length) {
   ErlDrvTermData *term;
   ErlDrvTermData  spec[9];
   term = ALLOC(sizeof(spec));
   if (term == NULL) return NULL;
-  
+
   spec[0] = ERL_DRV_ATOM;
   spec[1] = *tag;
   spec[2] = ERL_DRV_PORT;
   spec[3] = driver_mk_port(*port);
   /*if (result->format == Binary) {
-    spec[4] = ERL_DRV_BINARY; 
-    spec[5] = (ErlDrvBinary*)payload; 
+    spec[4] = ERL_DRV_BINARY;
+    spec[5] = (ErlDrvBinary*)payload;
     spec[6] = ERL_DRV_UINT;
     spec[7] = result->size;
   } else {*/
@@ -173,9 +172,9 @@ make_driver_term(ErlDrvPort *port, char *payload, ErlDrvTermData *tag, long *len
   spec[5] = payload;
   spec[6] = strlen(payload);
   /*}*/
-  spec[7] = ERL_DRV_TUPLE; 
+  spec[7] = ERL_DRV_TUPLE;
   spec[8] = 3;
-  
+
   memcpy(term, &spec, sizeof(spec));
   *length = sizeof(spec) / sizeof(spec[0]);
   return term;

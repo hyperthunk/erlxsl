@@ -261,15 +261,15 @@ describe "Assigning command_data Objects using the supplied macros"
   it "should allocate an initial slot and set the length/size property accordingly"
     create_test_data(test_command, command_foo);
     Command *cmd = init_command(test_command, NULL, NULL, init_iov(Object, 0, NULL));
-    PropListItem *item = ALLOC(sizeof(PropListItem));
-    write_cmd_data(PropListItem, item, cmd);
+    CmdData *item = ALLOC(sizeof(CmdData));
+    write_cmd_data(CmdData, item, cmd);
     
     DriverIOVec *iov = cmd->command_data.iov;
     
     iov should not be NULL;
     iov->size should equal 1;
     
-    PropListItem *data = (PropListItem*)iov->payload.data;
+    CmdData *data = (CmdData*)iov->payload.data;
     data should point_to item;
     free_command(cmd);
   end
@@ -277,15 +277,15 @@ describe "Assigning command_data Objects using the supplied macros"
   it "should allocate an initial slot and set the length/size property accordingly"
     create_test_data(test_command, command_foo);
     Command *cmd = init_command(test_command, NULL, NULL, init_iov(Object, 0, NULL));
-    PropListItem *item = ALLOC(sizeof(PropListItem));
+    CmdData *item = ALLOC(sizeof(CmdData));
     item->tag = "p1";
-    write_cmd_data(PropListItem, item, cmd);
+    write_cmd_data(CmdData, item, cmd);
 
-    PropListItem *item2 = ALLOC(sizeof(PropListItem));
+    CmdData *item2 = ALLOC(sizeof(CmdData));
     item2->tag = "p2";
-    write_cmd_data(PropListItem, item2, cmd);
+    write_cmd_data(CmdData, item2, cmd);
 
-    PropListItem *curr = cmd->command_data.iov->payload.data;
+    CmdData *curr = cmd->command_data.iov->payload.data;
     curr->tag should be_equal_to "p1";
     curr++;
     curr->tag should be_equal_to "p2";

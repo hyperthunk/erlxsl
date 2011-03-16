@@ -117,6 +117,7 @@ erlxsl_driver header file for details) to initialize an XslEngine structure.
 
 TODO: document ENGINE_COMMAND.
 TODO: locking during ENGINE_COMMAND calls when running in SMP mode (as other threads could be accessing shared data)
+TODO: support the transform command here as well - small binaries (which we can't/won't share/refcount) can be passed and copied...
 */
 static int
 call(ErlDrvData drv_data, unsigned int command, char *buf,
@@ -205,32 +206,33 @@ call(ErlDrvData drv_data, unsigned int command, char *buf,
 static char*
 read_ev(const ErlIOVec *ev, int iov_idx, int *buffer_size) {
   // TODO: when we're threaded, use driver_binary_inc_refc(bin) here and don't copy the data at all!
+  // TODO: tracking ref-counted binaries here
   int size;
   char *buffer;
   const char *source;
   SysIOVec iov = ev->iov[iov_idx];
   ErlDrvBinary* binv = ev->binv[iov_idx];
 
-  if (binv == NULL || binv->orig_size <= 64) {
-    INFO("Reading from iov\n");
+  if (binv == NULL || /* FIXME: this is a gross oversimplification - check the content instead */ binv->orig_size <= 64) {
+    INFO("Reading from iov (size: %i; data:%s)\n", iov.iov_len, &iov.iov_base[0]);
     size = iov.iov_len;
     source = &iov.iov_base[0];
   } else {
-    INFO("Reading from binv\n");
+    INFO("Reading from binv (size: %i; data:%s)\n", binv->orig_size, &binv->orig_bytes[0]);
     size = binv->orig_size;
     source = &binv->orig_bytes[0];
   }
-  if ((buffer = ALLOC(size + 1)) == NULL) {
+  INFO("---------------------------------------\n");
+  *buffer_size = size;
+  int slen = strlen(source);
+  int len = (slen < size) ? slen : size;
+  if ((buffer = ALLOC(len + 1)) == NULL) {
     return NULL;
   }
-  INFO("---------------------------------------\n");
-  INFO("Allocated buffer (size = %i)\n", size);
-  *buffer_size = size;
-  strncpy(buffer, source, size);
-  INFO("---------------------------------------\n");
-  INFO("BUFFER_START:\n");
-  INFO("%s", buffer);
-  INFO("BUFFER_END;\n")
+  INFO("Copying buffer (size: %i, allocated: %i)\n", size, strlen(buffer));
+  buffer[len] = '\0';
+  memcpy(buffer, source, len);
+  INFO("Finished with buffer (allocated: %i, copied: %s)\n", strlen(buffer), buffer);
   INFO("---------------------------------------\n");
   return buffer;
 }
@@ -265,6 +267,11 @@ outputv(ErlDrvData drv_data, ErlIOVec *ev) {
   int xml_size = 0;
   int xsl_size = 0;
 
+  // FIXME: this DOES NOT work when the xml/xsl input is a
+  // "heap allocated" binary, as these are passed as list data, causing concatenation
+  // of the iolist being passed in and completely screwing us up.
+
+  // TODO: For small/heap binaries, use the port_call routine instead
   if (ev->vsize < VSIZE) {
     INFO("ev->vsize = %i\n", ev->vsize);
     error_msg = "InconsistentInputVector: driver protocol not recognised.";
@@ -360,6 +367,8 @@ ready_async(ErlDrvData drv_data, ErlDrvThreadData data) {
   long response_len;
   ErlDrvTermData *term;
 
+  // TODO: release ref-counted binaries here
+
   DriverHandle *driver_handle = (DriverHandle*)drv_data;
   ErlDrvPort port = (ErlDrvPort)driver_handle->port;
   XslEngine *provider = (XslEngine*)driver_handle->engine;
@@ -402,6 +411,7 @@ ready_async(ErlDrvData drv_data, ErlDrvThreadData data) {
     return;
   }
 
+  // TODO: use driver_output_term instead, passing the origin-PID in the term and use gen_server:reply to forward
   driver_send_term(port, callee_pid, term, response_len);
 
   // now the engine needs the opportunity to free up any intermediate structures

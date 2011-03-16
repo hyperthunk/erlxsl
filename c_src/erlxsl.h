@@ -1,6 +1,6 @@
 /*
  * erlxsl.h
- * 
+ *
  * -----------------------------------------------------------------------------
  * Copyright (c) 2008-2010 Tim Watson (watson.timothy@gmail.com)
  *
@@ -61,7 +61,7 @@ extern "C" {
 #define DBG(str, ...)   /* disabled */
 #endif
 
-// writes to stderr 
+// writes to stderr
 #define ERROR(str, ...)  \
     LOG(stderr, str, ##__VA_ARGS__);
 
@@ -74,7 +74,7 @@ extern "C" {
     fprintf(stream, str, ##__VA_ARGS__);
 
 /* If the Command is not a null pointer and its command_string is equal to
-   the value "transform", evaluates to the XslTask associated with 
+   the value "transform", evaluates to the XslTask associated with
    its command_data, otherwise to NULL. */
 #define get_task(cmd) \
     ((cmd == NULL)                                        \
@@ -84,17 +84,17 @@ extern "C" {
         : NULL)
 
 /* If niether the supplied InputDocument nor its DriverIOVec is a null pointer
-   and the type of the DriverIOVec is set to Text, evaluates the size of 
+   and the type of the DriverIOVec is set to Text, evaluates the size of
    the DriverIOVec, otherwise NULL. */
 #define get_doc_buffer(idoc)  \
     ((idoc == NULL) ? NULL : get_buffer(idoc->iov))
 
-/* If niether the supplied InputDocument nor its DriverIOVec is a null pointer, 
+/* If niether the supplied InputDocument nor its DriverIOVec is a null pointer,
    evaluates the size of the DriverIOVec, otherwise NULL. */
 #define get_doc_size(idoc)    \
     ((idoc == NULL || idoc->iov == NULL) ? -1 : idoc->iov->size)
 
-/* If the supplied DriverIOVec is not a null pointer and it's type is set as Text, 
+/* If the supplied DriverIOVec is not a null pointer and it's type is set as Text,
    evaluates to the buffer payload, otherwise to NULL. */
 #define get_buffer(iov)             \
     ((iov == NULL)                  \
@@ -110,8 +110,8 @@ extern "C" {
        cmd->command_data.iov->payload.data = item))
 */
 
-#define get_item(item_type, item_index) \
-  (((item_type*)cmd->command_data.iov->payload.data) + item_index)
+#define get_item(item_type, item_idx) \
+  (((CmdData *)cmd->command_data.iov->payload.data) + item_idx);
 
 #define write_cmd_data(item_T, item, cmd) \
  ((cmd == NULL || item == NULL) \
@@ -145,7 +145,7 @@ extern "C" {
   } while (false)
 
 /* Resizes the result buffer of 'cmd' using its 'resize' function
- * pointer to the 'newsize'. The DriverIOVec size is updated and 
+ * pointer to the 'newsize'. The DriverIOVec size is updated and
  * the expression evaluates to the (potentially re-positioned) reassigned buffer.
  */
 #define resize_result_buffer(newsize, cmd) \
@@ -154,8 +154,8 @@ extern "C" {
 
 #define cmd_buff(cmd) cmd->result->payload.buffer
 
-/* Ensures the result DriverIOVec for cmd is sufficient to contain buff without destroying any existing data. 
-   Evaluates to the total contents of the current result buffer, or NULL if 
+/* Ensures the result DriverIOVec for cmd is sufficient to contain buff without destroying any existing data.
+   Evaluates to the total contents of the current result buffer, or NULL if
    cmd or cmd->result is a null pointer. */
 #define ensure_buffer(buff, cmd)  \
   ((cmd == NULL || buff == NULL) \
@@ -171,7 +171,7 @@ extern "C" {
         ? resize_result_buffer(strlen(buff) + strlen(cmd->result->payload.buffer), cmd) \
         : cmd->result->payload.buffer)
 
-/* Clears the results buffer of the supplied Command, unless cmd or cmd->result 
+/* Clears the results buffer of the supplied Command, unless cmd or cmd->result
    are null pointers. Evaluates to NULL in any case. */
 #define clear_result_buffer(cmd)                \
    do {                                         \
@@ -182,7 +182,7 @@ extern "C" {
      }                                          \
    } while (false)
 
-/* allocates a result buffer of the requested size, setting the 
+/* allocates a result buffer of the requested size, setting the
  * type and size fields of the DriverIOVec structure accordingly */
 #define make_result_buffer(buffersize, cmd) \
   ((cmd == NULL || buffersize <= 0) ? NULL \
@@ -192,12 +192,12 @@ extern "C" {
          cmd->result->payload.buffer = cmd->alloc(sizeof(char) * buffersize)))
 
 /*  Writes the given buffer to the results buffer of the supplied Command
-   
+
    - Ensures that the buffer is of sufficient size
    - If the buffer has already been written to, then buff is concatenated onto the end
    - If the buffer has not been written to, buff is copied into place
-   
-   Evaluates to the total contents of the current result buffer, or NULL if 
+
+   Evaluates to the total contents of the current result buffer, or NULL if
    cmd or cmd->result is a null pointer. */
 #define write_result_buffer(buff, cmd) \
   ((ensure_buffer(buff, cmd)) \
@@ -205,6 +205,12 @@ extern "C" {
       ? (cmd->result->dirty=1, strcpy(cmd->result->payload.buffer, buff))  \
       : strcat(cmd->result->payload.buffer, buff)  \
     : NULL)
+
+#define make_pid_data(Ser, Num) \
+    ((Uint) ((Ser) << _PID_NUM_SIZE | (Num)))
+
+#define get_cmd_data(cmd) \
+  ((CmdData*)cmd->command_data.iov->payload.data);
 
 /* Data Types & Aliasing */
 
@@ -215,6 +221,22 @@ typedef int8_t    Int8;
 typedef int16_t   Int16;
 typedef int32_t   Int32;
 typedef int64_t   Int64;
+
+// supported item types.
+typedef enum { String, Pid, Item } ItemType;
+
+/* used to represent unpacked buffers, decoding using ei functions */
+typedef struct {
+  /* atom tag */
+  char *tag;
+  /* type identifier */
+  ItemType type;
+  /* union for buffer or term */
+  union {
+    char *buffer;
+    void *data;
+  } payload;
+} CmdData;
 
 /* Indicates the transient state of a driver. */
 typedef enum {
@@ -250,26 +272,26 @@ typedef enum {
 } InputType;
 
 /* Indicator of the format for data stored in a DriverIOVec. */
-typedef enum { 
+typedef enum {
   /* Binary data (i.e., ErlDrvBinary). */
   Binary,
   /* ErlDrvTermData */
-  Term, 
+  Term,
   /* An ErlXSL API Object. */
-  Object, 
+  Object,
   /* A char buffer of raw data. */
   Text,
   /* An opaque handle - set by an XslEngine when caching XML documents. */
   Opaque
 } DataFormat;
 
-/* 
+/*
  * Used to pass data between the driver and an xsl_engine.
  * Stores data in either a character buffer or some other
  * format undefined at compile time - must be used with a value
- * from the DataFormat enum to indicate which 'payload' member is in use. 
- */  
-typedef struct { 
+ * from the DataFormat enum to indicate which 'payload' member is in use.
+ */
+typedef struct {
   /* FOR INTERNAL USE ONLY */
   unsigned int dirty:1;
   /* Indicates the type of data in the 'payload' field. */
@@ -286,23 +308,23 @@ typedef struct {
 
 /* Stores the data an input type specifier for an input document. */
 typedef struct {
-  /* 
+  /*
    * Indicates whether the buffer contains the document
-   * content, a file uri, a stream (IO vector) or a binary object 
+   * content, a file uri, a stream (IO vector) or a binary object
    */
   InputType type;
   /* Stores the actual payload (i.e., the document content, file uri, stream or binary object). */
   DriverIOVec* iov;
 } InputDocument;
 
-/* Stores the call context for a command, containing the port and caller pid. 
-   This is probably only of interest to XslEngine providers 
+/* Stores the call context for a command, containing the port and caller pid.
+   This is probably only of interest to XslEngine providers
    that wish to use ei/erlang APIs directly. */
 typedef struct {
   /* Stores the port associated with the current driver instance. */
   void* port;
   /* Stores the calling process' Pid. */
-  unsigned long caller_pid;  
+  unsigned long caller_pid;
 } DriverContext;
 
 /*
@@ -316,7 +338,7 @@ typedef struct {
   char* value;
   /* Stores a pointer to the next parameter, or NULL if this element is the tail. */
   void* next;
-} ParameterListNode;  
+} ParameterListNode;
 
 /* A specialised command pertaining to an XSLT transformation that has been tasked. */
 typedef struct {
@@ -324,11 +346,11 @@ typedef struct {
   InputDocument* input_doc;
   /* The xslt (XML) document. */
   InputDocument* xslt_doc;
-  /* The head of a linked list of parameters, or NULL if none are passed. */    
+  /* The head of a linked list of parameters, or NULL if none are passed. */
   ParameterListNode* parameters;
-} XslTask;  
+} XslTask;
 
-/* Allocation function type. */  
+/* Allocation function type. */
 typedef void* alloc_f(size_t size);
 
 /* Reallocation function type */
@@ -340,17 +362,17 @@ typedef void release_f(void* p);
 /* A generic command. */
 typedef struct {
   const char *command_string;
-  /* Stores either an IO vector containing the command data or an XslTask. 
-     When command_string == "transform" then command_data contains the XslTask. */        
+  /* Stores either an IO vector containing the command data or an XslTask.
+     When command_string == "transform" then command_data contains the XslTask. */
   union {
     // Data is held in a DriverIOVec
     DriverIOVec* iov;
     // Data is held as an XslTask
-    XslTask* xsl_task; 
+    XslTask* xsl_task;
   } command_data;
-  /* An IO vector containing the results. */        
+  /* An IO vector containing the results. */
   DriverIOVec* result;
-  /* The internal (driver) call context (i.e., port and calling process id). */    
+  /* The internal (driver) call context (i.e., port and calling process id). */
   DriverContext* context;
   /* Custom allocator (wraps drivers allocation strategy) */
   alloc_f* alloc;
@@ -361,19 +383,19 @@ typedef struct {
 } Command;
 
 /*
- * This function is the request handler hook used by plugins (such as 
+ * This function is the request handler hook used by plugins (such as
  * implementations for sablotron and/or libxslt).
- * 
+ *
  * The response structure passed contains the context required to get to
- * underlying data, along with fields which the plugin can fill in to 
+ * underlying data, along with fields which the plugin can fill in to
  * get data sent back to erlang.
  *
  */
-typedef EngineState transform_function(Command* cmd); 
+typedef EngineState transform_function(Command* cmd);
 
 /*
- * This function gives the implementing plugin a chance to cleanup 
- * after handle_request has returned. 
+ * This function gives the implementing plugin a chance to cleanup
+ * after handle_request has returned.
  *
  * Returns a value from the 'DriverState' enumeration to indicate
  * current system state. A return value of DriverState::ProviderError
@@ -391,11 +413,11 @@ typedef EngineState command_function(Command* cmd);
  * a meaningful return value, therefore the function returns void.
  *
  * After this function returns, the memory allocated for the xsl_engine will be
- * freed, which means that the engine must fully release all references/pointers 
+ * freed, which means that the engine must fully release all references/pointers
  * held before returning.
  */
 typedef void shutdown_function(void* state);
- 
+
 /* Represents an XSLT engine. */
 typedef struct {
   /* The following function pointers will need be set by the provider on startup */
