@@ -62,7 +62,7 @@ start() ->
 
 %% @doc starts erlxsl_port_server with default options.
 start(Config) ->
-  gen_server:start({local,?SERVER}, ?SERVER, Config, []).
+  gen_server:start({local, ?SERVER}, ?SERVER, Config, []).
 
 start_link() ->
   start_link(application:get_all_env(erlxsl)).
@@ -76,12 +76,14 @@ stop() ->
 
 %% TODO: document the API
 %% TODO: add type specs for the API
+
+%% @doc Transforms 'Input' using the supplied 'Xsl' stylesheet.
 transform(Input, Xsl) ->
   processing = gen_server:call(?SERVER, {transform, Input, Xsl}),
   receive
-    {_Ref, {result,_,Result}} ->
+    {_Ref, {result, _, Result}} ->
       Result;
-    {_Ref, {error, Error}=Err} ->
+    {_Ref, {error, _}=Err} ->
       Err;
     {data, Data} ->
       {error, Data};
@@ -89,6 +91,7 @@ transform(Input, Xsl) ->
   end.
 
 %% gen_server api
+
 init(Config) ->
   erlxsl_fast_log:info("initializing port_server with config [~p]~n",
                        [Config]),
@@ -104,7 +107,7 @@ init(Config) ->
   end.
 
 handle_call({transform, Input, Stylesheet}, From,
-            #state{ logger=Log, clients=CL }=State) ->
+            #state{ clients=CL }=State) ->
   WorkerPid = handle_transform(?BUFFER_INPUT, ?BUFFER_INPUT, Input,
                                Stylesheet, State, From),
   NewState = State#state{ clients=[{WorkerPid, From}|CL] },
@@ -122,7 +125,7 @@ handle_info({'EXIT', _, normal}, State) ->
   %% worker has completed successfully
   {normal, State};
 handle_info({'EXIT', Worker, Reason},
-            #state{ logger=Log, clients=CL }=State) ->
+            #state{ clients=CL }=State) ->
   %% TODO: what does it mean if we have no client? Is this part
   %%       of the error kernel for this server?
   Client = proplists:get_value(Worker, CL),

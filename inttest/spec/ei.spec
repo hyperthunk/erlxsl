@@ -30,7 +30,7 @@
 #include "cspec.h"
 #include "spec_includes.h"
 #include "ei_test.h"
-#include "erlxsl_ei.c"
+#include "erlxsl_ei.h"
 
 describe "Decoding Buffers using EI"
 

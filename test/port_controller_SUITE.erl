@@ -89,19 +89,6 @@ bad_args_transform(Config) ->
                [{erlxsl_marshall,pack,[buffer,buffer,bad,args]},
                 {erlxsl_port_controller, _, _}]}}, X).
 
-async_transform(_, _, Config) ->
-  {ok, Foo} = file:read_file(filename:join(?config(data_dir, Config), "foo.xml")),
-  X = erlxsl_port_controller:transform_async(Foo, <<"<output name='foo' age='21'/>">>),
-  ExpectedResult = binary_to_list(Foo) ++ binary_to_list(<<"<output name='foo' age='21'/>">>),
-  Result =
-  receive
-    Data -> Data
-  after 30000 ->
-    timeout
-  end,
-  ?assertThat(Result, is_not(equal_to(timeout))),
-  ?assertThat(binary_to_list(Result), equal_to(ExpectedResult)).
-
 transform_small_binaries(_, _, _) ->
   Foo = <<"<input />">>,
   ct:pal("Foo = ~p~n", [Foo]),
