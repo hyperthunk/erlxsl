@@ -45,7 +45,7 @@
 % public api exports
 
 % automatically registers all exported functions as test cases
-all() -> [basic_transform].
+all() -> [basic_transform, bad_args_transform].
    %% ?EXPORT_TESTS(?MODULE).
 
 init_per_suite(C) ->
@@ -84,6 +84,10 @@ basic_transform(Config) ->
   ct:pal("X = ~p~n", [X]),
   ExpectedResult = binary_to_list(Foo) ++ binary_to_list(<<"<output name='foo' age='21'/>">>),
   ?assertThat(binary_to_list(X), equal_to(ExpectedResult)).
+
+bad_args_transform(Config) ->
+  erlxsl_port_controller:transform(bad, args),
+  ok.
 
 transform_small_binaries(_) ->
   Foo = <<"<input />">>,

@@ -37,10 +37,12 @@
 -import(filename, [absname/1, dirname/1, rootname/2, join/2]).
 
 %% OTP Exports
--export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
+-export([init/1, handle_call/3, handle_cast/2,
+         handle_info/2, terminate/2, code_change/3]).
 
 %% Public API Exports
--export([start/0, start_link/0, start/1, start_link/1, stop/0, transform/2]).
+-export([start/0, start_link/0, start/1,
+         start_link/1, stop/0, transform/2]).
 
 -define(SERVER, ?MODULE).
 -define(PORT_INIT, 9).    %% magic number indicating that the port should initialize itself
@@ -49,7 +51,8 @@
   logger        :: module(),
   engine        :: string(),
   driver        :: string(),
-  load_path     :: string()
+  load_path     :: string(),
+  clients       :: [{pid(), pid()}]
 }).
 
 %% public api
@@ -74,9 +77,9 @@ stop() ->
   gen_server:cast(?SERVER, stop).
 
 transform(Input, Xsl) ->
-  gen_server:cast(?SERVER, {transform, Input, Xsl, self()}),
+  processing = gen_server:call(?SERVER, {transform, Input, Xsl}),
   receive
-    {result,_,Result} ->
+    {_Ref, {result,_,Result}} ->
       Result;
     {data, Data} ->
       {error, Data};
@@ -85,32 +88,44 @@ transform(Input, Xsl) ->
 
 %% gen_server api
 init(Config) ->
-  erlxsl_fast_log:info("initializing port_server with config [~p]~n", [Config]),
-  Options = proplists:get_value(driver_options, Config, [{engine, "default_provider"}]),
+  erlxsl_fast_log:info("initializing port_server with config [~p]~n",
+                       [Config]),
+  Options = proplists:get_value(driver_options, Config,
+                                [{engine, "default_provider"}]),
   State = init_config([proplists:get_value(logger, Config)|Options]),
   case State#state.engine of
-    undefined -> {stop, {config_error, "No XSLT Engine Specified."}};
+    undefined ->
+      {stop, {config_error, "No XSLT Engine Specified."}};
     _ ->
       process_flag(trap_exit, true),
       init_driver(State)
   end.
 
+handle_call({transform, Input, Stylesheet}, From,
+            #state{ logger=Log, clients=CL }=State) ->
+  WorkerPid = handle_transform(?BUFFER_INPUT, ?BUFFER_INPUT, Input,
+                               Stylesheet, State, From),
+  Log:debug("storing ~p for worker ~p~n", [From, WorkerPid]),
+  NewState = State#state{ clients=[{WorkerPid, From}|CL] },
+  start_worker(WorkerPid),
+  {reply, processing, NewState};
 handle_call(_Msg, _From, State) ->
   {noreply, State}.
 
-handle_cast({transform, Input, Stylesheet, Sender}, #state{logger=Log}=State) ->
-  %% TODO: move this into handle_call use gen_server:reply once the driver responds
-  Log:info("handle_cast sender = ~p~n", [Sender]),
-  handle_transform(?BUFFER_INPUT, ?BUFFER_INPUT,
-    Input, Stylesheet, State, Sender),
-  {noreply, State};
 handle_cast(stop, State) ->
   {stop, shutdown, State};
 handle_cast(_, State) ->
   {noreply, State}.
 
-handle_info(Unknown, #state{logger=Log}=State) ->
-  Log:warn("Port server received unknown message ~p~n", [Unknown]),
+handle_info({'EXIT', _, normal}, State) ->
+  %% worker has completed successfully
+  {normal, State};
+handle_info({'EXIT', Worker, Reason},
+            #state{ logger=Log, clients=CL }=State) ->
+  %% TODO: what does it mean if we have no client? Is this part
+  %%       of the error kernel for this server?
+  Client = proplists:get_value(Worker, CL),
+  gen_server:reply(Client, {error, Reason}),
   {noreply, State}.
 
 terminate(Reason, #state{ logger=Log, driver=Driver }) ->
@@ -122,14 +137,23 @@ code_change(_OldVsn, State, _Extra) ->
 
 %% private api
 
-handle_transform(InType, XslType, Input, Stylesheet, #state{ port=Port }, Sender) ->
-  %% TODO: don't ignore errors, don't let it potentially hang for ever, etc.....
-  %% TODO: move this into the handle_info callback and use gen_server:reply
-  spawn(
+start_worker(Pid) ->
+  Pid ! start.
+
+handle_transform(InType, XslType, Input, Stylesheet,
+                 #state{ port=Port, logger=Log }, Client) ->
+  %% TODO: don't let this potentially hang for ever:
+  %%       (a) we might never receive a response, so use a (configurable?) timeout
+  spawn_link(
     fun() ->
-      port_command(Port, erlxsl_marshall:pack(InType, XslType, Input, Stylesheet)),
-      receive
-        Data -> Sender ! Data
+      %% TODO: find a neater way of doing this 'pause until ready' thing
+      Log:debug("Waiting for start command..."),
+      receive start ->
+        port_command(Port, erlxsl_marshall:pack(InType, XslType,
+                                                Input, Stylesheet)),
+        receive
+          Data -> gen_server:reply(Client, Data)
+        end
       end
     end
   ).
