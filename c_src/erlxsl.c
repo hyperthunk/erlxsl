@@ -46,10 +46,14 @@ static const char* const transform_command = "transform";
 static const char* const unsupported_response_type = "Unsupported Response Type.";
 
 #define VSIZE 4
-#define TYPE_HEADER_VSIZE 2
+#define TYPE_HEADER_VSIZE 4
 #define TYPE_HEADER_IDX 1
+
 #define XML_TYPE_IDX 0
-#define XSL_TYPE_IDX 1
+#define XML_EV_OFFSET 1
+#define XSL_TYPE_IDX 2
+#define XSL_EV_OFFSET 3
+
 #define XML_BIN_IDX 2
 #define XSL_BIN_IDX 3
 
@@ -204,35 +208,37 @@ call(ErlDrvData drv_data, unsigned int command, char *buf,
 };
 
 static char*
-read_ev(const ErlIOVec *ev, int iov_idx, int *buffer_size) {
+read_ev(const ErlIOVec *ev, int iov_idx, bool is_binv, int *buffer_size) {
   // TODO: when we're threaded, use driver_binary_inc_refc(bin) here and don't copy the data at all!
   // TODO: tracking ref-counted binaries here
+  // NB: if is_binv != 0 then we CANNOT ref count the binary, we must copy it instead
   int size;
   char *buffer;
   const char *source;
   SysIOVec iov = ev->iov[iov_idx];
   ErlDrvBinary* binv = ev->binv[iov_idx];
 
-  if (binv == NULL || /* FIXME: this is a gross oversimplification - check the content instead */ binv->orig_size <= 64) {
-    INFO("Reading from iov (size: %lu; data:%s)\n", iov.iov_len, &iov.iov_base[0]);
+  if (!is_binv) {
+    INFO("Reading from iov (size: %lu)\n", iov.iov_len);
     size = iov.iov_len;
     source = &iov.iov_base[0];
   } else {
-    INFO("Reading from binv (size: %lu; data:%s)\n", binv->orig_size, &binv->orig_bytes[0]);
+    INFO("Reading from binv (size: %lu)\n", binv->orig_size);
     size = binv->orig_size;
     source = &binv->orig_bytes[0];
   }
   INFO("---------------------------------------\n");
   *buffer_size = size;
+  // FIXME: perform proper (overflow checking) conversion before comparing
   int slen = strlen(source);
   int len = (slen < size) ? slen : size;
   if ((buffer = ALLOC(len + 1)) == NULL) {
     return NULL;
   }
-  INFO("Copying buffer (size: %i, allocated: %lu)\n", size, strlen(buffer));
+  INFO("Copying buffer (size: %i)\n", size);
   buffer[len] = '\0';
   memcpy(buffer, source, len);
-  INFO("Finished with buffer (allocated: %lu, copied: %s)\n", strlen(buffer), buffer);
+  INFO("Finished with buffer (allocated: %lu)\n", strlen(buffer));
   INFO("---------------------------------------\n");
   return buffer;
 }
@@ -266,6 +272,7 @@ outputv(ErlDrvData drv_data, ErlIOVec *ev) {
   ErlDrvTermData callee_pid = driver_caller(port);
   int xml_size = 0;
   int xsl_size = 0;
+  UInt8 xml_iov_offset, xsl_iov_offset;
 
   // FIXME: this DOES NOT work when the xml/xsl input is a
   // "heap allocated" binary, as these are passed as list data, causing concatenation
@@ -291,11 +298,20 @@ outputv(ErlDrvData drv_data, ErlIOVec *ev) {
     driver_output2(port, error_msg, strlen(error_msg), NULL, 0);
     return;
   }
+
   hspec->input_kind = (UInt8)ev->iov[TYPE_HEADER_IDX].iov_base[XML_TYPE_IDX];
+  xml_iov_offset = (UInt8)ev->iov[TYPE_HEADER_IDX].iov_base[XML_EV_OFFSET];
   hspec->xsl_kind = (UInt8)ev->iov[TYPE_HEADER_IDX].iov_base[XSL_TYPE_IDX];
+  xsl_iov_offset = (UInt8)ev->iov[TYPE_HEADER_IDX].iov_base[XSL_EV_OFFSET];
+  // TODO: rethink/rework the parameter handling
   hspec->param_grp_arity = 0;
 
-  if ((xml = read_ev(ev, XML_BIN_IDX, &xml_size)) == NULL) {
+  INFO("outputv[ev:%i, offset1:%u, offset2:%u\n",
+       ev->vsize, (XML_BIN_IDX + xml_iov_offset),
+       (XSL_BIN_IDX + xsl_iov_offset + xml_iov_offset));
+
+  if ((xml = read_ev(ev, (XML_BIN_IDX + xml_iov_offset),
+                     xml_iov_offset == 0, &xml_size)) == NULL) {
     FAIL(port, "system_limit");
     return;
   }
@@ -304,8 +320,10 @@ outputv(ErlDrvData drv_data, ErlIOVec *ev) {
     return;
   }
   hsize->input_size = (UInt32)xml_size;
+  INFO("input_size: %u\n", xml_size);
 
-  if ((xsl = read_ev(ev, XSL_BIN_IDX, &xsl_size)) == NULL) {
+  if ((xsl = read_ev(ev, (XSL_BIN_IDX + xsl_iov_offset + xml_iov_offset),
+                     xsl_iov_offset == 0, &xsl_size)) == NULL) {
     DRV_FREE(xml);
     FAIL(port, "system_limit");
     return;
@@ -315,6 +333,7 @@ outputv(ErlDrvData drv_data, ErlIOVec *ev) {
     return;
   }
   hsize->xsl_size = (UInt32)xsl_size;
+  INFO("xsl_size: %u\n", xsl_size);
 
   if ((job = (XslTask*)try_driver_alloc(port,
     sizeof(XslTask), xml, xsl, hsize, hspec)) == NULL) return;

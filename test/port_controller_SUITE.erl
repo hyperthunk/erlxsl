@@ -83,15 +83,19 @@ basic_transform(Config) ->
   ExpectedResult = binary_to_list(Foo) ++ binary_to_list(<<"<output name='foo' age='21'/>">>),
   ?assertThat(binary_to_list(X), equal_to(ExpectedResult)).
 
+basic_transform_two_large_docs(Config) ->
+  {ok, Xml} = file:read_file(filename:join(?config(data_dir, Config), "foo.xml")),
+  {ok, Xsl} = file:read_file(filename:join(?config(data_dir, Config), "to_xml.xsl")),
+  X = erlxsl_port_controller:transform(Xml, Xsl),
+  ?assertThat(byte_size(X), equal_to(byte_size(Xml) + byte_size(Xsl))).
+
 bad_args_transform(Config) ->
   X = erlxsl_port_controller:transform(bad, args),
   ?assertMatch({error, {function_clause,
-               [{erlxsl_marshall,pack,[buffer,buffer,bad,args]},
+               [{erlxsl_marshall,pack,[_, buffer, buffer, bad, args]},
                 {erlxsl_port_controller, _, _}]}}, X).
 
-transform_small_binaries(_, _, _) ->
+transform_small_binaries(_) ->
   Foo = <<"<input />">>,
-  ct:pal("Foo = ~p~n", [Foo]),
   X = erlxsl_port_controller:transform(Foo, <<"<output />">>),
-  ct:pal("X = ~p~n", [X]),
-  ?assertThat(binary_to_list(X), equal_to(<<"<input /><output />">>)).
+  ?assertThat(binary_to_list(X), equal_to("<input /><output />")).

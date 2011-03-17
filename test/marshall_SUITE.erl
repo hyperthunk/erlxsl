@@ -37,6 +37,7 @@
 -compile(export_all).
 
 -include_lib("common_test/include/ct.hrl").
+-include_lib("hamcrest/include/hamcrest.hrl").
 -include_lib("eunit/include/eunit.hrl").
 -include("../include/test.hrl").
 -include("../include/erlxsl.hrl").
@@ -50,15 +51,17 @@ all() ->
 standard_request_creates_nested_iolist(_) ->
   Xml = <<"<fragment><empty /></fragment>">>,
   Xsl = <<"<?xml version='1.0'?>">>,
-  ?assertMatch(
-    [
-      [_XmlTypeHdr, _XslTypeHdr],
-      [_XmlDataBinary, _XslDataBinary]
-    ],
-    erlxsl_marshall:pack(?FILE_INPUT, ?FILE_INPUT, Xml, Xsl)
-  ).
+  Div = <<1>>,
+  Packed = erlxsl_marshall:pack(Div, ?FILE_INPUT,
+                                ?FILE_INPUT, Xml, Xsl),
+  Offset = ?DIV_OFFSET,
+  InputKind = 1,
+  InputHeader = [Offset, InputKind],
+  AllHeaders = [InputHeader, InputHeader],
+  ExpectedStructure = [AllHeaders, [Div, Xml, Div, Xsl]],
+  ?assertThat(Packed, is(equal_to(ExpectedStructure))).
 
-parameterised_request_becomes_nested_iolist(_) ->
+parameterised_request_becomes_nested_iolist(_, _, _) ->
   Xml = <<"<fragment><empty /></fragment>">>,
   Xsl = <<"<?xml version='1.0'?>">>,
   Parameters = [ {<<"p1">>, <<"value1">>}, {<<"p2">>, <<"value2">>} ],

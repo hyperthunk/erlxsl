@@ -23,7 +23,12 @@
 %% THE SOFTWARE.
 %% -----------------------------------------------------------------------------
 
+%% Input Type Markers
 -define(BUFFER_INPUT, buffer).
 -define(FILE_INPUT,   file).
+
+%% IOVec Offset Markers
+-define(DIV_OFFSET, 1).
+-define(NO_DIV_OFFSET, 0).
 
 -type(proplist() :: [{atom(), term()}]).

@@ -32,16 +32,18 @@
 -include("erlxsl.hrl").
 
 %% Public API Exports
--export([pack/4, pack/5]).
+-export([pack/5, pack/6]).
 
 %% FIXME: tighten up spec for /headers to specify the allowed range of atoms
 
 %% @doc Packs the input and xsl type metadata and instance
 %% data into an iolist, for submission to a linked-in port driver.
--spec(pack(InputType::atom(), XslType::atom(), Input::binary(), Xsl::binary()) -> iolist()).
-pack(InputType, XslType, Input, Xsl)
+-spec(pack(Dv::binary(), InputType::atom(), XslType::atom(),
+           Input::binary(), Xsl::binary()) ->
+      iolist()).
+pack(Dv, InputType, XslType, Input, Xsl)
 when is_binary(Input) andalso is_binary(Xsl) ->
-  pack(InputType, XslType, Input, Xsl, []).
+  pack(Dv, InputType, XslType, Input, Xsl, []).
 
 %% FIXME: "heap allocated" binaries are passed as list data!
 %% maybe plonk an empty 'separator' between entries? - ugly but simple
@@ -49,14 +51,29 @@ when is_binary(Input) andalso is_binary(Xsl) ->
 %% @doc Packs the input and xsl type metadata, instance data and the
 %% supplied proplist of parameters into an iolist, for submission
 %% to a linked-in port driver.
--spec(pack(InputType::atom(), XslType::atom(),
+-spec(pack(Dv::binary(), InputType::atom(), XslType::atom(),
            Input::binary(), Xsl::binary(), [{binary(), binary()}]) -> iolist()).
-pack(InputType, XslType, Input, Xsl, []) ->
-  [[pack(InputType), pack(XslType)], [Input, Xsl]];
-pack(InputType, XslType, Input, Xsl, Parameters) ->
-  [[pack(InputType), pack(XslType)],
-   [Input, Xsl],
-   [[Name, Value] || {Name, Value} <- Parameters]].
+pack(Dv, InputType, XslType, Input, Xsl, []) ->
+  [[pack(InputType, Input), pack(XslType, Xsl)],
+   lists:flatten([pack({Input, Dv}), pack({Xsl, Dv})])].
+
+pack(Type, Bin) when is_atom(Type) andalso is_binary(Bin) ->
+  Offset = case byte_size(Bin) =< 64 of
+    true ->
+      ?DIV_OFFSET;
+    false ->
+      ct:pal("No offset for ~p byte payload", [byte_size(Bin)]),
+      ?NO_DIV_OFFSET
+  end,
+  [pack(Type), Offset].
 
 pack(?BUFFER_INPUT) -> 0;
-pack(?FILE_INPUT) -> 1.
+pack(?FILE_INPUT) -> 1;
+pack({Bin, Dv}) ->
+  case byte_size(Bin) =< 64 of
+    true ->
+      [Dv, Bin];
+    false ->
+      ct:pal("No divider For ~p byte payload", [byte_size(Bin)]),
+      [Bin]
+  end.

@@ -46,12 +46,15 @@
 
 -define(SERVER, ?MODULE).
 -define(PORT_INIT, 9).    %% magic number indicating that the port should initialize itself
+-define(DIVIDER, list_to_binary(lists:seq(1, 65))).
+
 -record(state, {
   port          :: port(),
   logger        :: module(),
   engine        :: string(),
   driver        :: string(),
   load_path     :: string(),
+  bin_heap_div  :: binary(),
   clients = []  :: [{pid(), pid()}]   %% TODO: consider ets instead of in-proc state...
 }).
 
@@ -109,7 +112,7 @@ init(Config) ->
 handle_call({transform, Input, Stylesheet}, From,
             #state{ clients=CL }=State) ->
   WorkerPid = handle_transform(?BUFFER_INPUT, ?BUFFER_INPUT, Input,
-                               Stylesheet, State, From),
+                               Stylesheet, From, State),
   NewState = State#state{ clients=[{WorkerPid, From}|CL] },
   start_worker(WorkerPid),
   {reply, processing, NewState};
@@ -123,7 +126,7 @@ handle_cast(_, State) ->
 
 handle_info({'EXIT', _, normal}, State) ->
   %% worker has completed successfully
-  {normal, State};
+  {noreply, State};
 handle_info({'EXIT', Worker, Reason},
             #state{ clients=CL }=State) ->
   %% TODO: what does it mean if we have no client? Is this part
@@ -144,8 +147,8 @@ code_change(_OldVsn, State, _Extra) ->
 start_worker(Pid) ->
   Pid ! start.
 
-handle_transform(InType, XslType, Input, Stylesheet,
-                 #state{ port=Port, logger=Log }, Client) ->
+handle_transform(InType, XslType, Input, Stylesheet, Client,
+                 #state{ port=Port, logger=Log, bin_heap_div=Dv }) ->
   %% TODO: don't let this potentially hang for ever:
   %%       (a) we might never receive a response, so use a (configurable?) timeout
   spawn_link(
@@ -153,7 +156,7 @@ handle_transform(InType, XslType, Input, Stylesheet,
       %% TODO: find a neater way of doing this 'pause until ready' thing
       Log:debug("Waiting for start command...~n"),
       receive start ->
-        port_command(Port, erlxsl_marshall:pack(InType, XslType,
+        port_command(Port, erlxsl_marshall:pack(Dv, InType, XslType,
                                                 Input, Stylesheet)),
         receive
           Data -> gen_server:reply(Client, Data)
@@ -167,6 +170,7 @@ init_config(Config) ->
     logger=proplists:get_value(logger, Config, erlxsl_fast_log),
     engine=proplists:get_value(engine, Config, "default_provider"),
     driver=proplists:get_value(driver, Config, "erlxsl_drv"),
+    bin_heap_div= ?DIVIDER,
     load_path=proplists:get_value(load_path, Config, init_path())
   }.
 
