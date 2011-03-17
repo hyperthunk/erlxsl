@@ -48,7 +48,7 @@
 all() ->
   ?EXPORT_TESTS(?MODULE).
 
-standard_request_creates_nested_iolist(_) ->
+small_binaries_generate_placeholder_entries(_) ->
   Xml = <<"<fragment><empty /></fragment>">>,
   Xsl = <<"<?xml version='1.0'?>">>,
   Div = <<1>>,
@@ -56,9 +56,20 @@ standard_request_creates_nested_iolist(_) ->
                                 ?FILE_INPUT, Xml, Xsl),
   Offset = ?DIV_OFFSET,
   InputKind = 1,
-  InputHeader = [Offset, InputKind],
+  InputHeader = [InputKind, Offset],
   AllHeaders = [InputHeader, InputHeader],
   ExpectedStructure = [AllHeaders, [Div, Xml, Div, Xsl]],
+  ?assertThat(Packed, is(equal_to(ExpectedStructure))).
+
+standard_request_creates_nested_iolist(_, _, Config) ->
+  {ok, Xml} = file:read_file(filename:join(?config(data_dir, Config), "foo.xml")),
+  {ok, Xsl} = file:read_file(filename:join(?config(data_dir, Config), "to_xml.xsl")),
+  Packed = erlxsl_marshall:pack(<<"">>, ?FILE_INPUT, ?FILE_INPUT, Xml, Xsl),
+  Offset = ?NO_DIV_OFFSET,
+  InputKind = 1,
+  InputHeader = [InputKind, Offset],
+  AllHeaders = [InputHeader, InputHeader],
+  ExpectedStructure = [AllHeaders, [Xml, Xsl]],
   ?assertThat(Packed, is(equal_to(ExpectedStructure))).
 
 parameterised_request_becomes_nested_iolist(_, _, _) ->
