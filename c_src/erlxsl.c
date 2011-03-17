@@ -53,118 +53,6 @@ static const char* const unsupported_response_type = "Unsupported Response Type.
 #define XML_BIN_IDX 2
 #define XSL_BIN_IDX 3
 
-static DriverState
-submit(DriverHandle *dh, InputSpec *hspec, PayloadSize *hsize, char *xml, char *xsl) {
-  XslTask *job;
-  DriverContext *ctx;
-  AsyncState *asd;
-  DriverState state;
-  ErlDrvPort port = (ErlDrvPort)dh->port;
-  ErlDrvTermData callee_pid = driver_caller(port);
-
-  if ((job = (XslTask*)try_driver_alloc(port,
-    sizeof(XslTask), xml, xsl, hsize, hspec)) == NULL) return OutOfMemoryError;
-  if ((ctx = (DriverContext*)try_driver_alloc(port,
-    sizeof(DriverContext), xml, xsl, hsize, hspec, job)) == NULL) return OutOfMemoryError;
-  if ((asd = (AsyncState*)try_driver_alloc(port,
-    sizeof(AsyncState), xml, xsl, hsize, hspec, job, ctx)) == NULL) return OutOfMemoryError;
-
-  ctx->port = port;
-  ctx->caller_pid = callee_pid;
-  asd->driver = dh;
-  if ((asd->command = init_command(transform_command, ctx, job, NULL)) == NULL) {
-    free_async_state(asd);
-    FAIL(port, "system_limit");
-    return OutOfMemoryError;
-  }
-
-  //fprintf(stderr, "xml = %s\n", xml);
-  //fprintf(stderr, "xsl (len %i) = %s (len %i)\n", hsize->xsl_size, xsl, strlen(xsl));
-
-  state = init_task(job, hsize, hspec, xml, xsl);
-  if (state == OutOfMemoryError) {
-    free_async_state(asd);
-    FAIL(port, "system_limit");
-  } else if (state == Success) {
-    /*
-    driver_async will call engine->transform passing command, then
-    call ready_async followed by cleanup_task. The synchronous code
-    works something like this:
-
-    (*a->async_invoke)(a->async_data);
-    if (async_ready(prt, a->async_data)) {
-      if (a->async_free != NULL)
-        (*a->async_free)(a->async_data);
-    }
-    */
-    driver_async(port, NULL, apply_transform, asd, NULL);
-  } else {  // TODO: it would be better if we didn't do "everthing else is an error" here
-    state = UnsupportedOperationError;
-  }
-  return state;
-};
-
-static char*
-read_ev(const ErlIOVec *ev, int iov_idx, int *buffer_size) {
-  // TODO: when we're threaded, use driver_binary_inc_refc(bin) here and don't copy the data at all!
-  // TODO: tracking ref-counted binaries here
-  int size;
-  char *buffer;
-  const char *source;
-  SysIOVec iov = ev->iov[iov_idx];
-  ErlDrvBinary* binv = ev->binv[iov_idx];
-
-  if (binv == NULL || /* FIXME: this is a gross oversimplification - check the content instead */ binv->orig_size <= 64) {
-    INFO("Reading from iov (size: %lu; data:%s)\n", iov.iov_len, &iov.iov_base[0]);
-    size = iov.iov_len;
-    source = &iov.iov_base[0];
-  } else {
-    INFO("Reading from binv (size: %li; data:%s)\n", binv->orig_size, &binv->orig_bytes[0]);
-    size = binv->orig_size;
-    source = &binv->orig_bytes[0];
-  }
-  INFO("---------------------------------------\n");
-  *buffer_size = size;
-  int slen = strlen(source);
-  int len = (slen < size) ? slen : size;
-  if ((buffer = ALLOC(len + 1)) == NULL) {
-    return NULL;
-  }
-  INFO("Copying buffer (size: %i, allocated: %lu)\n", size, strlen(buffer));
-  buffer[len] = '\0';
-  memcpy(buffer, source, len);
-  INFO("Finished with buffer (allocated: %lu, copied: %s)\n", strlen(buffer), buffer);
-  INFO("---------------------------------------\n");
-  return buffer;
-}
-
-static DriverState
-decode_ei_input_doc(InputSpec *hspec, PayloadSize *hsize,
-  char *buff, char *dest, int *index) {
-
-  int arity;
-  char type_code;
-  unsigned long document_size;
-
-  if (DECODE_OK(ei_decode_tuple_header(buff, index, &arity))) {
-    if (arity != 3) {
-      return DecodeError;
-    }
-    if (!DECODE_OK(ei_decode_char(buff, index, &type_code))) {
-      return DecodeError;
-    }
-    hspec->input_kind = (UInt8)type_code;
-    if (!DECODE_OK(ei_decode_ulong(buff, index, &document_size))) {
-      return DecodeError;
-    }
-    hsize->input_size = (UInt32)document_size;
-    if (!DECODE_OK(ei_decode_string(buff, index, dest))) {
-      return DecodeError;
-    }
-  }
-  return DecodeError;
-}
-
 /* DRIVER CALLBACK FUNCTIONS */
 
 // Called by the emulator when the driver is starting.
@@ -235,28 +123,20 @@ static int
 call(ErlDrvData drv_data, unsigned int command, char *buf,
   int len, char **rbuf, int rlen, unsigned int *flags) {
 
-  DriverState state;
-  DriverContext *ctx;
-  Command *cmd;
-  InputSpec *hspec;
-  PayloadSize *hsize;
-  DriverHandle *d = (DriverHandle*)drv_data;
-  ErlDrvPort port = (ErlDrvPort)d->port;
-
-  char *data;
-  char *xml;
-  char *xsl;
-
   int i;
   int type;
   int size;
   int index = 0;
   int rindex = 0;
-  int arity;
+  /*int arity;
+   *
+  char cmd[MAXATOMLEN];*/
+  char *data;
+  DriverState state;
+  DriverHandle *d = (DriverHandle*)drv_data;
 
   ei_decode_version(buf, &index, &i);
-  switch (command) {
-  case INIT_COMMAND:
+  if (command == INIT_COMMAND) {
     ei_get_type(buf, &index, &type, &size);
     INFO("ei_get_type %s of size = %i\n", ((char*)&type), size);
     // TODO: pull options tuple instead
@@ -264,45 +144,16 @@ call(ErlDrvData drv_data, unsigned int command, char *buf,
     ei_decode_string(buf, &index, data);
     INFO("Driver received data %s\n", data);
     state = init_provider(d, data);
-    break;
-  case TRANSFORM_COMMAND:
-    if ((hspec = ALLOC(sizeof(InputSpec))) == NULL) {
-      FAIL(port, "system_limit");
-      state = OutOfMemory;
-      break;
-    }
-
-    if ((hsize = (PayloadSize*)try_driver_alloc(port,
-        sizeof(PayloadSize), hspec)) == NULL) break;
-
-    if (DECODE_OK(ei_decode_tuple_header(buf, &index, &arity))) {
-      if (arity != 2) {
-        state = UnsupportedOperationError;
-        break;
-      }
-    }
-
-    if ((state = decode_ei_input_doc(hspec,
-        hsize, buf, xml, &index)) != Success) break;
-
-    if ((state = decode_ei_input_doc(hspec,
-        hsize, buf, xml, &index)) != Success) break;
-
-    // TODO: parameters
-
-    state = submit(d, hspec, hsize, xml, xsl);
-    break;
-  case ENGINE_COMMAND:
-    ctx = ALLOC(sizeof(DriverContext));
+  } else if (command == ENGINE_COMMAND) {
+    DriverContext *ctx = ALLOC(sizeof(DriverContext));
     // ErlDrvPort port = (ErlDrvPort)d->port;
     // XslEngine *engine = (XslEngine*)d->engine;
     // ErlDrvTermData callee_pid = driver_caller(port);
-    cmd = init_command(NULL, ctx, NULL, init_iov(Text, 0, NULL));
-    // NB: decode_ei_cmd will consume the entire content of the buffer
+    Command *cmd = init_command(NULL, ctx, NULL, init_iov(Text, 0, NULL));
+
     state = decode_ei_cmd(cmd, buf, &index);
     if (state == Success) {
       XslEngine *engine = (XslEngine*)d->engine;
-      // NB: not all engines will support the 'command' operation
       if (engine->command != NULL) {
         EngineState enstate = engine->command(cmd);
         if (enstate == Ok) {
@@ -314,8 +165,7 @@ call(ErlDrvData drv_data, unsigned int command, char *buf,
     INFO("ei_get_type %s of size = %i\n", ((char*)&type), size);
     data = ALLOC(size + 1);
     ei_decode_string(buf, &index, data);*/
-    break;
-  default:
+  } else {
     state = UnknownCommand;
   }
 
@@ -327,10 +177,15 @@ call(ErlDrvData drv_data, unsigned int command, char *buf,
 #endif
     ei_encode_atom(*rbuf, &rindex, "configured");
   } else if (state == Success) {
-    if (command == ENGINE_COMMAND) {
-      ei_encode_atom(*rbuf, &rindex, "ok");
-    } else if (command == TRANSFORM_COMMAND) {
-      ei_encode_atom(*rbuf, &rindex, "accepted");
+    ei_encode_tuple_header(*rbuf, &rindex, 2);
+    ei_encode_atom(*rbuf, &rindex, "ok");
+    if (state == OutOfMemory) {
+      ei_encode_string(*rbuf, &rindex, heap_space_exhausted);
+    } else if (state == UnknownCommand) {
+      ei_encode_string(*rbuf, &rindex, unknown_command);
+    } else {
+      const char *err = (d->loader)->error_message;
+      ei_encode_string_len(*rbuf, &rindex, err, strlen(err));
     }
   } else {
     ei_encode_tuple_header(*rbuf, &rindex, 2);
@@ -348,6 +203,40 @@ call(ErlDrvData drv_data, unsigned int command, char *buf,
   return(rindex);
 };
 
+static char*
+read_ev(const ErlIOVec *ev, int iov_idx, int *buffer_size) {
+  // TODO: when we're threaded, use driver_binary_inc_refc(bin) here and don't copy the data at all!
+  // TODO: tracking ref-counted binaries here
+  int size;
+  char *buffer;
+  const char *source;
+  SysIOVec iov = ev->iov[iov_idx];
+  ErlDrvBinary* binv = ev->binv[iov_idx];
+
+  if (binv == NULL || /* FIXME: this is a gross oversimplification - check the content instead */ binv->orig_size <= 64) {
+    INFO("Reading from iov (size: %lu; data:%s)\n", iov.iov_len, &iov.iov_base[0]);
+    size = iov.iov_len;
+    source = &iov.iov_base[0];
+  } else {
+    INFO("Reading from binv (size: %lu; data:%s)\n", binv->orig_size, &binv->orig_bytes[0]);
+    size = binv->orig_size;
+    source = &binv->orig_bytes[0];
+  }
+  INFO("---------------------------------------\n");
+  *buffer_size = size;
+  int slen = strlen(source);
+  int len = (slen < size) ? slen : size;
+  if ((buffer = ALLOC(len + 1)) == NULL) {
+    return NULL;
+  }
+  INFO("Copying buffer (size: %i, allocated: %lu)\n", size, strlen(buffer));
+  buffer[len] = '\0';
+  memcpy(buffer, source, len);
+  INFO("Finished with buffer (allocated: %lu, copied: %s)\n", strlen(buffer), buffer);
+  INFO("---------------------------------------\n");
+  return buffer;
+}
+
 /*
 This function is called whenever the port is written to. The port should be in binary mode, see open_port/2.
 The ErlIOVec contains both a SysIOVec, suitable for writev, and one or more binaries. If these binaries should be retained,
@@ -364,13 +253,19 @@ outputv(ErlDrvData drv_data, ErlIOVec *ev) {
   char *error_msg;
   char *xml;
   char *xsl;
-  int xml_size = 0;
-  int xsl_size = 0;
 
   DriverHandle *d = (DriverHandle*)drv_data;
   ErlDrvPort port = (ErlDrvPort)d->port;
   InputSpec *hspec;
   PayloadSize *hsize;
+
+  XslTask *job;
+  DriverContext *ctx;
+  AsyncState *asd;
+  DriverState state;
+  ErlDrvTermData callee_pid = driver_caller(port);
+  int xml_size = 0;
+  int xsl_size = 0;
 
   // FIXME: this DOES NOT work when the xml/xsl input is a
   // "heap allocated" binary, as these are passed as list data, causing concatenation
@@ -404,6 +299,10 @@ outputv(ErlDrvData drv_data, ErlIOVec *ev) {
     FAIL(port, "system_limit");
     return;
   }
+  if (xml_size < 0) {
+    FAIL(port, "overflow_detected");
+    return;
+  }
   hsize->input_size = (UInt32)xml_size;
 
   if ((xsl = read_ev(ev, XSL_BIN_IDX, &xsl_size)) == NULL) {
@@ -411,9 +310,56 @@ outputv(ErlDrvData drv_data, ErlIOVec *ev) {
     FAIL(port, "system_limit");
     return;
   }
+  if (xsl_size < 0) {
+    FAIL(port, "overflow_detected");
+    return;
+  }
   hsize->xsl_size = (UInt32)xsl_size;
 
-  submit(d, hspec, hsize, xml, xsl);
+  if ((job = (XslTask*)try_driver_alloc(port,
+    sizeof(XslTask), xml, xsl, hsize, hspec)) == NULL) return;
+  if ((ctx = (DriverContext*)try_driver_alloc(port,
+    sizeof(DriverContext), xml, xsl, hsize, hspec, job)) == NULL) return;
+  if ((asd = (AsyncState*)try_driver_alloc(port,
+    sizeof(AsyncState), xml, xsl, hsize, hspec, job, ctx)) == NULL) return;
+
+  ctx->port = port;
+  ctx->caller_pid = callee_pid;
+  asd->driver = d;
+  if ((asd->command = init_command(transform_command, ctx, job, NULL)) == NULL) {
+    free_async_state(asd);
+    FAIL(port, "system_limit");
+    return;
+  }
+
+  fprintf(stderr, "xml = %s\n", xml);
+  fprintf(stderr, "xsl (len %i) = %s (len %lu)\n", hsize->xsl_size, xsl, strlen(xsl));
+
+  state = init_task(job, hsize, hspec, xml, xsl);
+  switch (state) {
+  case OutOfMemoryError:
+    free_async_state(asd);
+    FAIL(port, "system_limit");
+    return;
+  case Success:
+    /*
+    driver_async will call engine->transform passing command, then
+    call ready_async followed by cleanup_task. The synchronous code
+    works something like this:
+
+    (*a->async_invoke)(a->async_data);
+    if (async_ready(prt, a->async_data)) {
+      if (a->async_free != NULL)
+        (*a->async_free)(a->async_data);
+    }
+    */
+    INFO("provider handoff: transform\n");
+    driver_async(port, NULL, apply_transform, asd, NULL); //cleanup_task);
+    break;
+  default:  // TODO: it would be better if we didn't do "everthing else is an error" here
+    // TODO: error!?
+    break;
+  }
 };
 
 /*
