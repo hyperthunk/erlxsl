@@ -4,7 +4,7 @@ The aim of this project is to provide a usable binding for Erlang to call native
 
 ## Status
 
-This project is pre-alpha at the moment. There are marshalling issues with R14, so R13 is the target erts version at the moment. An initial spike has also been built with very basic functionality, which works on 32bit systems running R12B. 
+This project is pre-alpha at the moment and is not fit for general use. The software should build against Erlang releases >= R13, on linux and OS X. The sablotron-prototype branch can be built and run against 32bit R12B, but is not meant for general use. 
 
 ## Roadmap
 
