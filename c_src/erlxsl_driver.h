@@ -51,6 +51,7 @@ static ErlDrvTermData atom_log;
 // magics for command identification
 #define INIT_COMMAND (UInt32)9
 #define ENGINE_COMMAND (UInt32)7
+#define TRANSFORM_COMMAND (UInt32)5
 
 // NULL safe driver_free wrapper
 #define DRV_FREE(x) if (x != NULL) driver_free(x)
@@ -169,7 +170,7 @@ make_driver_term(ErlDrvPort *port, char *payload, ErlDrvTermData *tag, long *len
     spec[7] = result->size;
   } else {*/
   spec[4] = ERL_DRV_BUF2BINARY;
-  spec[5] = payload;
+  spec[5] = (ErlDrvTermData)payload;
   spec[6] = strlen(payload);
   /*}*/
   spec[7] = ERL_DRV_TUPLE;
