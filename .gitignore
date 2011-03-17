@@ -25,4 +25,5 @@ c_src/cscope.outcscope.out
 *.swp
 **/*.swp
 inttest/deps/cspec
-inttest/bin/all_specs
+inttest/bin/all_specserlxsl.komodoproject
+.komodotools/

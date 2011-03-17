@@ -42,11 +42,17 @@
 -include("../include/test.hrl").
 -include("../include/erlxsl.hrl").
 
-%% public api exports
-
 %% automatically registers all exported functions as test cases
 all() ->
   ?EXPORT_TESTS(?MODULE).
+
+init_per_testcase(_, Config) ->
+  DataDir = ?config(data_dir, Config),
+  Fixtures = test_support:get_fixture_dir(DataDir),
+  [{fixtures, Fixtures}|Config].
+
+end_per_testcase(_, _) ->
+  ok.
 
 small_binaries_generate_placeholder_entries(_) ->
   Xml = <<"<fragment><empty /></fragment>">>,
@@ -62,8 +68,9 @@ small_binaries_generate_placeholder_entries(_) ->
   ?assertThat(Packed, is(equal_to(ExpectedStructure))).
 
 standard_request_creates_nested_iolist(_, _, Config) ->
-  {ok, Xml} = file:read_file(filename:join(?config(data_dir, Config), "foo.xml")),
-  {ok, Xsl} = file:read_file(filename:join(?config(data_dir, Config), "to_xml.xsl")),
+  Fixtures = ?config(fixtures, Config),
+  {ok, Xml} = file:read_file(?fixture(Config, "foo.xml")),
+  {ok, Xsl} = file:read_file(?fixture(Config, "to_xml.xsl")),
   Packed = erlxsl_marshall:pack(<<"">>, ?FILE_INPUT, ?FILE_INPUT, Xml, Xsl),
   Offset = ?NO_DIV_OFFSET,
   InputKind = 1,

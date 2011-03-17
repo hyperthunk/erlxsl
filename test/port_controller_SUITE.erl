@@ -77,19 +77,29 @@ init_per_suite(C) ->
 end_per_suite(_) ->
   erlxsl_app:stop().
 
+init_per_testcase(_, Config) ->
+  DataDir = ?config(data_dir, Config),
+  Fixtures = test_support:get_fixture_dir(DataDir),
+  [{fixtures, Fixtures}|Config].
+
+end_per_testcase(_, _) ->
+  ok.
+
 basic_transform(Config) ->
-  {ok, Foo} = file:read_file(filename:join(?config(data_dir, Config), "foo.xml")),
+  {ok, Foo} = file:read_file(?fixture(Config, "foo.xml")),
   X = erlxsl_port_controller:transform(Foo, <<"<output name='foo' age='21'/>">>),
   ExpectedResult = binary_to_list(Foo) ++ binary_to_list(<<"<output name='foo' age='21'/>">>),
   ?assertThat(binary_to_list(X), equal_to(ExpectedResult)).
 
 basic_transform_two_large_docs(Config) ->
-  {ok, Xml} = file:read_file(filename:join(?config(data_dir, Config), "foo.xml")),
-  {ok, Xsl} = file:read_file(filename:join(?config(data_dir, Config), "to_xml.xsl")),
-  X = erlxsl_port_controller:transform(Xml, Xsl),
-  ?assertThat(byte_size(X), equal_to(byte_size(Xml) + byte_size(Xsl))).
+  %% really just demonstrates handling a *reasonable* amount of data (in + out)
+  %% TODO: proper test case around *very large* inputs/output
+  %% TODO: streaming api support?
+  {ok, Xml} = file:read_file(?fixture(Config, "to_xml.xsl")),
+  X = erlxsl_port_controller:transform(Xml, Xml),
+  ?assertThat(byte_size(X), equal_to(byte_size(Xml) * 2)).
 
-bad_args_transform(Config) ->
+bad_args_transform(_) ->
   X = erlxsl_port_controller:transform(bad, args),
   ?assertMatch({error, {function_clause,
                [{erlxsl_marshall,pack,[_, buffer, buffer, bad, args]},

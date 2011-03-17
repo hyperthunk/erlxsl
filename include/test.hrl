@@ -2,6 +2,8 @@
 %% @copyright 2007 author.
 %% common tests macros and functions
 
+-define(fixture(Config, File),
+        filename:join(?config(fixtures, Config), File)).
 -define(TESTDOC(Doc), [{userdata,[{doc,Doc}]}]).
 -define(NOT_IMPLEMENTED, {skip,"Not implemented."}).
 -define(EXPORT_TESTS(Mod),
