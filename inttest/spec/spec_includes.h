@@ -1,6 +1,6 @@
 /*
  * spec_includes.h
- * 
+ *
  * -----------------------------------------------------------------------------
  * Copyright (c) 2008-2010 Tim Watson (watson.timothy@gmail.com)
  *
@@ -42,49 +42,49 @@ char assert_failed[2046];
 // overwrite ALLOC macro
 
 void *_spec_alloc(size_t size) {
-  if (allow_allocations == false) return NULL;
-  if (allow_allocation_sizes == -1 || allow_allocation_sizes == size) {
-    return malloc(size);
-  } else {
-    return NULL;
-  }
+    if (allow_allocations == false) return NULL;
+    if (allow_allocation_sizes == -1 || allow_allocation_sizes == size) {
+        return malloc(size);
+    } else {
+        return NULL;
+    }
 };
 
 #define ALLOC(size) _spec_alloc(size)
 
 #define do_with_nomem(stmt) \
-  allow_allocations = false; stmt; \
-  allow_allocations = true
+    allow_allocations = false; stmt; \
+    allow_allocations = true
 
-#define with_denied_allocation(size, stmt)  \
-  allow_allocation_sizes = size; stmt; \
-  allow_allocation_sizes = -1;
+#define with_denied_allocation(size, stmt)    \
+    allow_allocation_sizes = size; stmt; \
+    allow_allocation_sizes = -1;
 
-#define create_test_data(Out, In)    \
-  char *Out = ALLOC(sizeof(char) * strlen(In));  \
-  strcpy(Out, In)
+#define create_test_data(Out, In)        \
+    char *Out = ALLOC(sizeof(char) * strlen(In));    \
+    strcpy(Out, In)
 
 #define match_be_equal_to(A, E) \
-  (strncmp(A, E, strlen(E)) == 0)
+    (strncmp(A, E, strlen(E)) == 0)
 
 // override 'assert' behaviour
 
 #define _TEST_ASSERT true
 
-#define ASSERT(_s)  \
-  (!(_s) \
-    ? (strcpy(assert_failed, #_s))  \
-    : ((void) 0))
+#define ASSERT(_s)    \
+    (!(_s) \
+        ? (strcpy(assert_failed, #_s))    \
+        : ((void) 0))
 
 void _spec_free(void *x) {
-  if (x != NULL) {
-    free(x);
-  }
+    if (x != NULL) {
+        free(x);
+    }
 };
 
 #define _DRV_FREE
 #define DRV_FREE(x) \
-  do { DBG("Free " #x " [%p]", x); \
+    do { DBG("Free " #x " [%p]", x); \
     _spec_free(x); } while (false)
 
 #include "erlxsl_port.h"

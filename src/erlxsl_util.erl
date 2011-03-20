@@ -37,13 +37,13 @@
 -compile(export_all).
 
 os_platform() ->
-  match_platform(["darwin", "linux", "win32", "windows"]).
+    match_platform(["darwin", "linux", "win32", "windows"]).
 
 -spec(match_platform(list(string())) -> atom()).
 match_platform([H|T]) ->
-  case re:run(erlang:system_info(system_architecture), H, [{capture, none}]) of
-    match -> list_to_atom(H);
-    _ -> match_platform(T)
-  end;
+    case re:run(erlang:system_info(system_architecture), H, [{capture, none}]) of
+      match -> list_to_atom(H);
+      _ -> match_platform(T)
+    end;
 match_platform([]) -> unknown.
 

@@ -1,5 +1,5 @@
 {application,
- erlxsl,
+erlxsl,
  [{description,"C-XSLT Bindings for Erlang/OTP"},
   {vsn,"0.0.1"},
   {mod,{erlxsl_app,[]}},

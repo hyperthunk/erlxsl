@@ -43,29 +43,26 @@
       iolist()).
 pack(InputType, XslType, Input, Xsl)
 when is_binary(Input) andalso is_binary(Xsl) ->
-  pack(InputType, XslType, Input, Xsl, []).
-
-%% FIXME: "heap allocated" binaries are passed as list data!
-%% maybe plonk an empty 'separator' between entries? - ugly but simple
+    pack(InputType, XslType, Input, Xsl, []).
 
 %% @doc Packs the input and xsl type metadata, instance data and the
 %% supplied proplist of parameters into an iolist.
 -spec(pack(InputType::atom(), XslType::atom(),
            Input::binary(), Xsl::binary(), [{binary(), binary()}]) -> iolist()).
 pack(InputType, XslType, Input, Xsl, Params) ->
-  PSize = length(Params),
-  T1 = pack(InputType),
-  T2 = pack(XslType),
-  B1 = byte_size(Input),
-  B2 = byte_size(Xsl),
-  %% FIXME: whilst more than max uint8_t parameters is unlikely, it would
-  %% be good to deal with this limitation more explicitly (or remove it)
-  [<<PSize:8/native,
-     T1:8/native,
-     T2:8/native,
-     B1:64/native,
-     B2:64/native>>,
-     Input, Xsl].
+    PSize = length(Params),
+    T1 = pack(InputType),
+    T2 = pack(XslType),
+    B1 = byte_size(Input),
+    B2 = byte_size(Xsl),
+    %% FIXME: whilst more than max uint8_t parameters is unlikely, it would
+    %% be good to deal with this limitation more explicitly (or remove it)
+    [<<PSize:8/native,
+       T1:8/native,
+       T2:8/native,
+       B1:64/native,
+       B2:64/native>>,
+       Input, Xsl].
 
 pack(?BUFFER_INPUT) -> 0;
 pack(?FILE_INPUT) -> 1.

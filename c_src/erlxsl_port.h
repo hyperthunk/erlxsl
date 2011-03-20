@@ -54,8 +54,8 @@
 
 // Cause the driver to fail (e.g., exit/unload)
 #define FAIL(p, msg)  \
- ERROR(msg);          \
- exit(1);
+    ERROR(msg);          \
+    exit(1);
 
 #include "erlxsl.h"
 /* we want all the internal utility functions and any additional includes now. */

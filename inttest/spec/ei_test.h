@@ -1,6 +1,6 @@
 /*
  * ei_test.h
- * 
+ *
  * -----------------------------------------------------------------------------
  * Copyright (c) 2008-2010 Tim Watson (watson.timothy@gmail.com)
  *
@@ -22,7 +22,7 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  * -----------------------------------------------------------------------------
- * 
+ *
  * EI Test Functions/Utilities
  *
  */
@@ -32,62 +32,62 @@
 
 #define MAXATOMLEN 255
 
-#define ERL_SMALL_INTEGER_EXT 'a'
-#define ERL_INTEGER_EXT       'b'
-#define ERL_FLOAT_EXT         'c'
-#define ERL_ATOM_EXT          'd'
-#define ERL_REFERENCE_EXT     'e'
-#define ERL_NEW_REFERENCE_EXT 'r'
-#define ERL_PORT_EXT          'f'
-#define ERL_PID_EXT           'g'
-#define ERL_SMALL_TUPLE_EXT   'h'
-#define ERL_LARGE_TUPLE_EXT   'i'
-#define ERL_NIL_EXT           'j'
-#define ERL_STRING_EXT        'k'
-#define ERL_LIST_EXT          'l'
-#define ERL_BINARY_EXT        'm'
-#define ERL_SMALL_BIG_EXT     'n'
-#define ERL_LARGE_BIG_EXT     'o'
-#define ERL_NEW_FUN_EXT	      'p'
-#define ERL_FUN_EXT	          'u'
+#define ERL_SMALL_INTEGER_EXT   'a'
+#define ERL_INTEGER_EXT         'b'
+#define ERL_FLOAT_EXT           'c'
+#define ERL_ATOM_EXT            'd'
+#define ERL_REFERENCE_EXT       'e'
+#define ERL_NEW_REFERENCE_EXT   'r'
+#define ERL_PORT_EXT            'f'
+#define ERL_PID_EXT             'g'
+#define ERL_SMALL_TUPLE_EXT     'h'
+#define ERL_LARGE_TUPLE_EXT     'i'
+#define ERL_NIL_EXT             'j'
+#define ERL_STRING_EXT          'k'
+#define ERL_LIST_EXT            'l'
+#define ERL_BINARY_EXT          'm'
+#define ERL_SMALL_BIG_EXT       'n'
+#define ERL_LARGE_BIG_EXT       'o'
+#define ERL_NEW_FUN_EXT	        'p'
+#define ERL_FUN_EXT	            'u'
 
 #define with_atom(s, expr) \
-  do { \
-    test_type = ERL_ATOM_EXT; \
-    test_buff = s; \
     do { \
-      expr; \
-    } while (false)\
-  } while(false)
+        test_type = ERL_ATOM_EXT; \
+        test_buff = s; \
+        do { \
+            expr; \
+        } while (false)\
+    } while(false)
 
 #define with_string(s, expr) \
-  do { \
-    test_type = ERL_STRING_EXT; \
-    test_buff = s; \
     do { \
-      expr; \
-    } while (false)\
-  } while(false)
+        test_type = ERL_STRING_EXT; \
+        test_buff = s; \
+        do { \
+            expr; \
+        } while (false)\
+    } while(false)
 
 #define with_tuple(size, expr) \
-  do { \
-    test_type = ERL_SMALL_TUPLE_EXT; \
-    test_arity = size; \
-    expr; \
-  } while(false)
+    do { \
+        test_type = ERL_SMALL_TUPLE_EXT; \
+        test_arity = size; \
+        expr; \
+    } while(false)
 
 #define with_type(type, expr) \
-  do { \
-    test_type = type; \
-    expr; \
-  } while (false)
+    do { \
+        test_type = type; \
+        expr; \
+    } while (false)
 
 #define with_ei_fail(expr) \
-  do { \
-    test_fail = true; \
-    expr; \
-    test_fail = false; \
-  } while (false)
+    do { \
+        test_fail = true; \
+        expr; \
+        test_fail = false; \
+    } while (false)
 
 static int ei_get_type(const char *buf, const int *index, int *type, int *size);
 static int ei_decode_string(const char *buf, int *index, char *p);
@@ -100,33 +100,33 @@ static bool test_fail = false;
 static int test_arity;
 
 static int ei_get_type(const char *buf, const int *index, int *type, int *size) {
-  // buf is ignored...
-  if (test_fail == true) {
-    return 1;
-  }
-  *type = test_type;
-  return 0;
+    // buf is ignored...
+    if (test_fail == true) {
+        return 1;
+    }
+    *type = test_type;
+    return 0;
 };
 
 static int ei_decode_tuple_header(const char *buf, int *index, int *arity) {
-  // buf is ignored...
-  if (test_fail) return 1;
-  *arity= test_arity;
-  (*index)++;
-  return 0;
+    // buf is ignored...
+    if (test_fail) return 1;
+    *arity= test_arity;
+    (*index)++;
+    return 0;
 };
 
 static int ei_decode_atom(const char *buf, int *index, char *p) {
-  return ei_decode_string(buf, index, p);
+    return ei_decode_string(buf, index, p);
 }
 
 static int ei_decode_string(const char *buf, int *index, char *p) {
-  // buf is ignored...
-  if (test_fail) return 1;
-  int i = *index;
-  *index = (i += strlen(test_buff));
-  strcpy(p, test_buff);
-  return 0;
+    // buf is ignored...
+    if (test_fail) return 1;
+    int i = *index;
+    *index = (i += strlen(test_buff));
+    strcpy(p, test_buff);
+    return 0;
 };
 
 #endif /* _SPEC_EI_H */

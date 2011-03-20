@@ -44,36 +44,36 @@
 
 %% automatically registers all exported functions as test cases
 all() ->
-  ?EXPORT_TESTS(?MODULE).
+    ?EXPORT_TESTS(?MODULE).
 
 init_per_testcase(_, Config) ->
-  DataDir = ?config(data_dir, Config),
-  Fixtures = test_support:get_fixture_dir(DataDir),
-  [{fixtures, Fixtures}|Config].
+    DataDir = ?config(data_dir, Config),
+    Fixtures = test_support:get_fixture_dir(DataDir),
+    [{fixtures, Fixtures}|Config].
 
 end_per_testcase(_, _) ->
-  ok.
+    ok.
 
 standard_request_creates_nested_iolist(_) ->
-  Xml = <<"<fragment><empty /></fragment>">>,
-  Xsl = <<"<?xml version='1.0'?>">>,
-  Packed = erlxsl_marshall:pack(?FILE_INPUT, ?FILE_INPUT,
-                                Xml, Xsl),
-  Headers = <<0:8/native,
-              1:8/native,
-              1:8/native,
-              (byte_size(Xml)):64/native,
-              (byte_size(Xsl)):64/native>>,
-  ExpectedStructure = [Headers, Xml, Xsl],
-  ?assertThat(Packed, is(equal_to(ExpectedStructure))).
+    Xml = <<"<fragment><empty /></fragment>">>,
+    Xsl = <<"<?xml version='1.0'?>">>,
+    Packed = erlxsl_marshall:pack(?FILE_INPUT, ?FILE_INPUT,
+                                  Xml, Xsl),
+    Headers = <<0:8/native,
+                1:8/native,
+                1:8/native,
+                (byte_size(Xml)):64/native,
+                (byte_size(Xsl)):64/native>>,
+    ExpectedStructure = [Headers, Xml, Xsl],
+    ?assertThat(Packed, is(equal_to(ExpectedStructure))).
 
 parameterised_request_becomes_nested_iolist(_, _, _) ->
-  Xml = <<"<fragment><empty /></fragment>">>,
-  Xsl = <<"<?xml version='1.0'?>">>,
-  Parameters = [ {<<"p1">>, <<"value1">>}, {<<"p2">>, <<"value2">>} ],
-  ?assertMatch(
-    [[1, 1], [Xml, Xsl],
-     [[<<"p1">>, <<"value1">>],
-      [<<"p2">>, <<"value2">>]]],
-    erlxsl_marshall:pack(?FILE_INPUT, ?FILE_INPUT, Xml, Xsl, Parameters)),
-  ok.
+    Xml = <<"<fragment><empty /></fragment>">>,
+    Xsl = <<"<?xml version='1.0'?>">>,
+    Parameters = [ {<<"p1">>, <<"value1">>}, {<<"p2">>, <<"value2">>} ],
+    ?assertMatch(
+      [[1, 1], [Xml, Xsl],
+       [[<<"p1">>, <<"value1">>],
+        [<<"p2">>, <<"value2">>]]],
+      erlxsl_marshall:pack(?FILE_INPUT, ?FILE_INPUT, Xml, Xsl, Parameters)),
+    ok.

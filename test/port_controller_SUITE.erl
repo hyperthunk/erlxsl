@@ -45,73 +45,73 @@
 % public api exports
 
 % automatically registers all exported functions as test cases
-all() -> %% [transform_small_binaries].
-  ?EXPORT_TESTS(?MODULE).
+all() ->
+    ?EXPORT_TESTS(?MODULE).
 
 init_per_suite(C) ->
-  BaseDir  = filename:rootname(filename:dirname(filename:absname(code:which(?MODULE))), "test"),
-  PrivDir = filename:join(filename:join(BaseDir, "priv"), "bin"),
-  % ?config(priv_dir, C),
-  AppSpec = ct:get_config(test_app_config),
-  {application, erlxsl, Conf} = AppSpec,
-  {env, Env} = lists:keyfind(env, 1, Conf),
-  {driver_options, Opts} = lists:keyfind(driver_options, 1, Env),
-  UpdatedOpts =
-  case erlxsl_util:os_platform() of
-    %% FIXME: horrible - do this some other way (like switching on win32 and defaulting for *nix)
-    Atom when Atom =:= darwin orelse Atom =:= linux ->
-      lists:keyreplace(load_path, 1, Opts, {load_path, PrivDir});
-    _ -> Opts
-  end,
-  Lib = proplists:get_value(engine, UpdatedOpts),
-  ct:pal("startup with lib ~p~n", [Lib]),
-  UpdatedOpts2 = lists:keyreplace(engine, 1, UpdatedOpts,
-    {engine, filename:join(filename:join(BaseDir, "priv/test/bin"), Lib)}),
-  UpdatedEnv = lists:keyreplace(driver_options, 1, Env, {driver_options, UpdatedOpts2}),
-  UpdatedConf = lists:keyreplace(env, 1, Conf, {env, UpdatedEnv}),
-  TestAppSpec = {application, erlxsl, UpdatedConf},
-  application:load(TestAppSpec),
-  erlxsl_app:start(),
-  C.
+    BaseDir  = filename:rootname(filename:dirname(filename:absname(code:which(?MODULE))), "test"),
+    PrivDir = filename:join(filename:join(BaseDir, "priv"), "bin"),
+    % ?config(priv_dir, C),
+    AppSpec = ct:get_config(test_app_config),
+    {application, erlxsl, Conf} = AppSpec,
+    {env, Env} = lists:keyfind(env, 1, Conf),
+    {driver_options, Opts} = lists:keyfind(driver_options, 1, Env),
+    UpdatedOpts =
+    case erlxsl_util:os_platform() of
+      %% FIXME: horrible - do this some other way (like switching on win32 and defaulting for *nix)
+      Atom when Atom =:= darwin orelse Atom =:= linux ->
+        lists:keyreplace(load_path, 1, Opts, {load_path, PrivDir});
+      _ -> Opts
+    end,
+    Lib = proplists:get_value(engine, UpdatedOpts),
+    ct:pal("startup with lib ~p~n", [Lib]),
+    UpdatedOpts2 = lists:keyreplace(engine, 1, UpdatedOpts,
+      {engine, filename:join(filename:join(BaseDir, "priv/test/bin"), Lib)}),
+    UpdatedEnv = lists:keyreplace(driver_options, 1, Env, {driver_options, UpdatedOpts2}),
+    UpdatedConf = lists:keyreplace(env, 1, Conf, {env, UpdatedEnv}),
+    TestAppSpec = {application, erlxsl, UpdatedConf},
+    application:load(TestAppSpec),
+    erlxsl_app:start(),
+    C.
 
 end_per_suite(_) ->
-  erlxsl_app:stop().
+    erlxsl_app:stop().
 
 init_per_testcase(_, Config) ->
-  DataDir = ?config(data_dir, Config),
-  Fixtures = test_support:get_fixture_dir(DataDir),
-  [{fixtures, Fixtures}|Config].
+    DataDir = ?config(data_dir, Config),
+    Fixtures = test_support:get_fixture_dir(DataDir),
+    [{fixtures, Fixtures}|Config].
 
 end_per_testcase(_, _) ->
-  ok.
+    ok.
 
 basic_transform(Config) ->
-  ct:pal("basic_transform", []),
-  {ok, Foo} = file:read_file(?fixture(Config, "foo.xml")),
-  X = erlxsl_port_controller:transform(Foo, <<"<output name='foo' age='21'/>">>),
-  ExpectedResult = binary_to_list(Foo) ++ binary_to_list(<<"<output name='foo' age='21'/>">>),
-  ?assertThat(binary_to_list(X), equal_to(ExpectedResult)).
+    ct:pal("basic_transform", []),
+    {ok, Foo} = file:read_file(?fixture(Config, "foo.xml")),
+    X = erlxsl_port_controller:transform(Foo, <<"<output name='foo' age='21'/>">>),
+    ExpectedResult = binary_to_list(Foo) ++ binary_to_list(<<"<output name='foo' age='21'/>">>),
+    ?assertThat(binary_to_list(X), equal_to(ExpectedResult)).
 
 basic_transform_two_large_docs(Config) ->
-  %% really just demonstrates handling a *reasonable* amount of data (in + out)
-  %% TODO: proper test case around *very large* inputs/output
-  %% TODO: streaming api support?
-  ct:pal("basic_transform_two_large_docs", []),
-  {ok, Xml} = file:read_file(?fixture(Config, "to_xml.xsl")),
-  X = erlxsl_port_controller:transform(Xml, Xml),
-  ?assertThat(byte_size(X), equal_to(byte_size(Xml) * 2)).
+    %% really just demonstrates handling a *reasonable* amount of data (in + out)
+    %% TODO: proper test case around *very large* inputs/output
+    %% TODO: streaming api support?
+    ct:pal("basic_transform_two_large_docs", []),
+    {ok, Xml} = file:read_file(?fixture(Config, "to_xml.xsl")),
+    X = erlxsl_port_controller:transform(Xml, Xml),
+    ?assertThat(byte_size(X), equal_to(byte_size(Xml) * 2)).
 
 bad_args_transform(_) ->
-  ct:pal("bad_args_transform", []),
-  X = erlxsl_port_controller:transform(bad, args),
-  ?assertMatch({error, {function_clause,
-               [{erlxsl_marshall,pack,[buffer, buffer, bad, args]},
-                {erlxsl_port_controller, _, _}]}}, X).
+    ct:pal("bad_args_transform", []),
+    X = erlxsl_port_controller:transform(bad, args),
+    ?assertMatch({error, {function_clause,
+                 [{erlxsl_marshall,pack,[buffer, buffer, bad, args]},
+                  {erlxsl_port_controller, _, _}]}}, X).
 
 transform_small_binaries(Config) ->
-  ct:pal("transform_small_binaries", []),
-  Xml = <<"<input />">>,
-  {ok, Xsl} = file:read_file(?fixture(Config, "minimal.xsl")),
-  X = erlxsl_port_controller:transform(Xml, Xsl),
-  ExpectedResult = binary_to_list(Xml) ++ binary_to_list(Xsl),
-  ?assertThat(binary_to_list(X), equal_to(ExpectedResult)).
+    ct:pal("transform_small_binaries", []),
+    Xml = <<"<input />">>,
+    {ok, Xsl} = file:read_file(?fixture(Config, "minimal.xsl")),
+    X = erlxsl_port_controller:transform(Xml, Xsl),
+    ExpectedResult = binary_to_list(Xml) ++ binary_to_list(Xsl),
+    ?assertThat(binary_to_list(X), equal_to(ExpectedResult)).
