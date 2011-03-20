@@ -45,17 +45,9 @@ static const char* const heap_space_exhausted = "Out of Memory!";
 static const char* const transform_command = "transform";
 static const char* const unsupported_response_type = "Unsupported Response Type.";
 
-#define VSIZE 4
-#define TYPE_HEADER_VSIZE 4
-#define TYPE_HEADER_IDX 1
-
-#define XML_TYPE_IDX 0
-#define XML_EV_OFFSET 1
-#define XSL_TYPE_IDX 2
-#define XSL_EV_OFFSET 3
-
-#define XML_BIN_IDX 2
-#define XSL_BIN_IDX 3
+#define NUM_TYPE_HEADERS 3
+#define NUM_SIZE_HEADERS 2
+#define FIRST_BINV_ENTRY 1
 
 /* DRIVER CALLBACK FUNCTIONS */
 
@@ -207,42 +199,6 @@ call(ErlDrvData drv_data, unsigned int command, char *buf,
   return(rindex);
 };
 
-static char*
-read_ev(const ErlIOVec *ev, int iov_idx, bool is_binv, int *buffer_size) {
-  // TODO: when we're threaded, use driver_binary_inc_refc(bin) here and don't copy the data at all!
-  // TODO: tracking ref-counted binaries here
-  // NB: if is_binv != 0 then we CANNOT ref count the binary, we must copy it instead
-  int size;
-  char *buffer;
-  const char *source;
-  SysIOVec iov = ev->iov[iov_idx];
-  ErlDrvBinary* binv = ev->binv[iov_idx];
-
-  if (!is_binv) {
-    INFO("Reading from iov (size: %lu)\n", iov.iov_len);
-    size = iov.iov_len;
-    source = &iov.iov_base[0];
-  } else {
-    INFO("Reading from binv (size: %lu)\n", binv->orig_size);
-    size = binv->orig_size;
-    source = &binv->orig_bytes[0];
-  }
-  INFO("---------------------------------------\n");
-  *buffer_size = size;
-  // FIXME: perform proper (overflow checking) conversion before comparing
-  int slen = strlen(source);
-  int len = (slen < size) ? slen : size;
-  if ((buffer = ALLOC(len + 1)) == NULL) {
-    return NULL;
-  }
-  INFO("Copying buffer (size: %i)\n", size);
-  buffer[len] = '\0';
-  memcpy(buffer, source, len);
-  INFO("Finished with buffer (allocated: %lu)\n", strlen(buffer));
-  INFO("---------------------------------------\n");
-  return buffer;
-}
-
 /*
 This function is called whenever the port is written to. The port should be in binary mode, see open_port/2.
 The ErlIOVec contains both a SysIOVec, suitable for writev, and one or more binaries. If these binaries should be retained,
@@ -256,9 +212,11 @@ XslEngine callback functions. The results of processing are handled on a main em
 */
 static void
 outputv(ErlDrvData drv_data, ErlIOVec *ev) {
-  char *error_msg;
+
+  // char *error_msg;
   char *xml;
   char *xsl;
+  char *data;
 
   DriverHandle *d = (DriverHandle*)drv_data;
   ErlDrvPort port = (ErlDrvPort)d->port;
@@ -270,21 +228,8 @@ outputv(ErlDrvData drv_data, ErlIOVec *ev) {
   AsyncState *asd;
   DriverState state;
   ErlDrvTermData callee_pid = driver_caller(port);
-  int xml_size = 0;
-  int xsl_size = 0;
-  UInt8 xml_iov_offset, xsl_iov_offset;
-
-  // FIXME: this DOES NOT work when the xml/xsl input is a
-  // "heap allocated" binary, as these are passed as list data, causing concatenation
-  // of the iolist being passed in and completely screwing us up.
-
-  // TODO: For small/heap binaries, use the port_call routine instead
-  if (ev->vsize < VSIZE) {
-    INFO("ev->vsize = %i\n", ev->vsize);
-    error_msg = "InconsistentInputVector: driver protocol not recognised.";
-    driver_output2(port, error_msg, strlen(error_msg), NULL, 0);
-    return;
-  }
+  UInt8 *type1;
+  UInt64 *size;
 
   if ((hspec = ALLOC(sizeof(InputSpec))) == NULL) {
     FAIL(port, "system_limit");
@@ -293,47 +238,59 @@ outputv(ErlDrvData drv_data, ErlIOVec *ev) {
   if ((hsize = (PayloadSize*)try_driver_alloc(port,
     sizeof(PayloadSize), hspec)) == NULL) return;
 
-  if (ev->iov[TYPE_HEADER_IDX].iov_len != TYPE_HEADER_VSIZE) {
-    error_msg = "InconsistentInputHeaders: driver protocol not recognised.";
-    driver_output2(port, error_msg, strlen(error_msg), NULL, 0);
-    return;
-  }
+  DBG("sizeof(uint64_t): %lu \n", sizeof(UInt64));
+  DBG("ev->vsize: %i \n", ev->vsize);
 
-  hspec->input_kind = (UInt8)ev->iov[TYPE_HEADER_IDX].iov_base[XML_TYPE_IDX];
-  xml_iov_offset = (UInt8)ev->iov[TYPE_HEADER_IDX].iov_base[XML_EV_OFFSET];
-  hspec->xsl_kind = (UInt8)ev->iov[TYPE_HEADER_IDX].iov_base[XSL_TYPE_IDX];
-  xsl_iov_offset = (UInt8)ev->iov[TYPE_HEADER_IDX].iov_base[XSL_EV_OFFSET];
-  // TODO: rethink/rework the parameter handling
-  hspec->param_grp_arity = 0;
+  // the first 8bit chunk holds the number of parameters
+  type1 = ((UInt8*)ev->binv[1]->orig_bytes);
+  hspec->param_grp_arity = *type1;
 
-  INFO("outputv[ev:%i, offset1:%u, offset2:%u\n",
-       ev->vsize, (XML_BIN_IDX + xml_iov_offset),
-       (XSL_BIN_IDX + xsl_iov_offset + xml_iov_offset));
+  // next two 8bit chunks hold the type specs
+  type1++;
+  hspec->input_kind = *type1;
 
-  if ((xml = read_ev(ev, (XML_BIN_IDX + xml_iov_offset),
-                     xml_iov_offset == 0, &xml_size)) == NULL) {
-    FAIL(port, "system_limit");
-    return;
-  }
-  if (xml_size < 0) {
-    FAIL(port, "overflow_detected");
-    return;
-  }
-  hsize->input_size = (UInt32)xml_size;
-  INFO("input_size: %u\n", xml_size);
+  type1++;
+  hspec->xsl_kind = *type1;
 
-  if ((xsl = read_ev(ev, (XSL_BIN_IDX + xsl_iov_offset + xml_iov_offset),
-                     xsl_iov_offset == 0, &xsl_size)) == NULL) {
-    DRV_FREE(xml);
-    FAIL(port, "system_limit");
-    return;
+  // next two 64bit chunks hold the type specs
+  type1++;
+  size = ((UInt64*)type1);
+  hsize->input_size = *size;
+
+  size++;
+  hsize->xsl_size = *size;
+
+  // next comes the xml and xslt binaries, which may be in one of three places:
+  // 1. if the XML binary is heap allocated, it'll be in the binv entry
+  // 2. if the XML binary is not heap allocated, it'll be in the next binv entry
+  // 3. if the XSL binary is not heap allocated, it'll be in the next binv entry
+  //    otherwise it'll bin in the (following) SysIOVec
+
+  // if there is enough space remaining in a binv entry for the input document,
+  // we pull it from there. Otherwise, it'll be collapsed into the first binary.
+  size_t pos = ((sizeof(UInt8) * NUM_TYPE_HEADERS) +
+                (sizeof(UInt64) * NUM_SIZE_HEADERS));
+  // INFO("pos = %lu \n", pos);
+  UInt8 bin_idx = FIRST_BINV_ENTRY;  // first entry is reserved
+
+  if ((pos + hsize->input_size) <= ev->binv[bin_idx]->orig_size) {
+    data = (char*)(&ev->binv[bin_idx]->orig_bytes[pos]);
+  } else {
+    data = ev->binv[++bin_idx]->orig_bytes;
   }
-  if (xsl_size < 0) {
-    FAIL(port, "overflow_detected");
-    return;
+  // FIXME: find a way around NULL terminated strings and we can share the binary!
+  xml = ALLOC(hsize->input_size + 1);
+  xml[hsize->input_size] = '\0';
+  strncpy(xml, data, hsize->input_size);
+
+  if (hsize->xsl_size < 64) {
+    data = &ev->iov[++bin_idx].iov_base[0];
+  } else {
+    data = ev->binv[++bin_idx]->orig_bytes;
   }
-  hsize->xsl_size = (UInt32)xsl_size;
-  INFO("xsl_size: %u\n", xsl_size);
+  xsl = ALLOC(hsize->xsl_size + 1);
+  xsl[hsize->xsl_size] = '\0';
+  strncpy(xsl, data, hsize->xsl_size);
 
   if ((job = (XslTask*)try_driver_alloc(port,
     sizeof(XslTask), xml, xsl, hsize, hspec)) == NULL) return;
@@ -351,8 +308,8 @@ outputv(ErlDrvData drv_data, ErlIOVec *ev) {
     return;
   }
 
-  fprintf(stderr, "xml = %s\n", xml);
-  fprintf(stderr, "xsl (len %i) = %s (len %lu)\n", hsize->xsl_size, xsl, strlen(xsl));
+  fprintf(stderr, "xml[spec: %lu, len:%lu]\n", (long unsigned int)hsize->input_size, strlen(xml));
+  fprintf(stderr, "xsl[spec: %lu, len:%lu]\n", (long unsigned int)hsize->xsl_size, strlen(xsl));
 
   state = init_task(job, hsize, hspec, xml, xsl);
   switch (state) {
@@ -393,8 +350,6 @@ static void
 ready_async(ErlDrvData drv_data, ErlDrvThreadData data) {
   long response_len;
   ErlDrvTermData *term;
-
-  // TODO: release ref-counted binaries here
 
   DriverHandle *driver_handle = (DriverHandle*)drv_data;
   ErlDrvPort port = (ErlDrvPort)driver_handle->port;
@@ -437,6 +392,8 @@ ready_async(ErlDrvData drv_data, ErlDrvThreadData data) {
     // this statement [above] will cause the driver to unload, so we may as well fail fast....
     return;
   }
+
+  INFO("Sending back response! \n");
 
   // TODO: use driver_output_term instead, passing the origin-PID in the term and use gen_server:reply to forward
   driver_send_term(port, callee_pid, term, response_len);

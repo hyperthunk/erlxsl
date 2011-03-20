@@ -68,15 +68,15 @@ typedef struct {
 typedef struct {
   UInt8 input_kind;
   UInt8 xsl_kind;
-  UInt16 param_grp_arity;
+  UInt8 param_grp_arity;
 } InputSpec;
 
 /*
  * Specifies the data size(s) for the payload.
  */
 typedef struct  {
-  UInt32 input_size;
-  UInt32 xsl_size;
+  UInt64 input_size;
+  UInt64 xsl_size;
 } PayloadSize;
 
 /*
@@ -279,7 +279,7 @@ static void apply_transform(void *asd) {
   XslEngine* engine = driver->engine;
   Command* command = data->command;
   data->state = engine->transform(command);
-  DBG("output buffer: %s\n", command->result->payload.buffer);
+  INFO("output buffer: %s\n", command->result->payload.buffer);
 };
 
 static void
@@ -287,10 +287,8 @@ free_iov(DriverIOVec *iov) {
   if (iov != NULL) {
     if (iov->dirty == 1) {
       if (iov->type == Text) {
-        DBG("Freeing iov buffer %s\n", iov->payload.buffer);
         DRV_FREE(iov->payload.buffer);
       } else {
-        DBG("Freeing iov data %p\n", iov->payload.data);
         DRV_FREE(iov->payload.data);
       }
     }
@@ -301,11 +299,8 @@ free_iov(DriverIOVec *iov) {
 static void
 free_parameters(ParameterListNode *current) {
   ParameterListNode *next;
-  DBG("cleanup parameters\n");
   while (current != NULL) {
-    DBG("current wasn't null!? - %p\n", current);
     next = (ParameterListNode*)current->next;
-    DBG("next - %p\n", next);
     DRV_FREE(current->key);
     DRV_FREE(current->value);
     DRV_FREE(current);

@@ -114,7 +114,6 @@ handle_call({transform, Input, Stylesheet}, From,
   WorkerPid = handle_transform(?BUFFER_INPUT, ?BUFFER_INPUT, Input,
                                Stylesheet, From, State),
   NewState = State#state{ clients=[{WorkerPid, From}|CL] },
-  start_worker(WorkerPid),
   {reply, processing, NewState};
 handle_call(_Msg, _From, State) ->
   {noreply, State}.
@@ -144,23 +143,17 @@ code_change(_OldVsn, State, _Extra) ->
 
 %% private api
 
-start_worker(Pid) ->
-  Pid ! start.
-
 handle_transform(InType, XslType, Input, Stylesheet, Client,
-                 #state{ port=Port, logger=Log, bin_heap_div=Dv }) ->
+                 #state{ port=Port, logger=Log, bin_heap_div=_Dv }) ->
   %% TODO: don't let this potentially hang for ever:
   %%       (a) we might never receive a response, so use a (configurable?) timeout
   spawn_link(
     fun() ->
       %% TODO: find a neater way of doing this 'pause until ready' thing
-      Log:debug("Waiting for start command...~n"),
-      receive start ->
-        port_command(Port, erlxsl_marshall:pack(Dv, InType, XslType,
-                                                Input, Stylesheet)),
-        receive
-          Data -> gen_server:reply(Client, Data)
-        end
+      port_command(Port, erlxsl_marshall:pack(InType, XslType,
+                                              Input, Stylesheet)),
+      receive
+        Data -> gen_server:reply(Client, Data)
       end
     end
   ).

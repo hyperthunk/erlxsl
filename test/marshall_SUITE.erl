@@ -54,29 +54,17 @@ init_per_testcase(_, Config) ->
 end_per_testcase(_, _) ->
   ok.
 
-small_binaries_generate_placeholder_entries(_) ->
+standard_request_creates_nested_iolist(_) ->
   Xml = <<"<fragment><empty /></fragment>">>,
   Xsl = <<"<?xml version='1.0'?>">>,
-  Div = <<1>>,
-  Packed = erlxsl_marshall:pack(Div, ?FILE_INPUT,
-                                ?FILE_INPUT, Xml, Xsl),
-  Offset = ?DIV_OFFSET,
-  InputKind = 1,
-  InputHeader = [InputKind, Offset],
-  AllHeaders = [InputHeader, InputHeader],
-  ExpectedStructure = [AllHeaders, [Div, Xml, Div, Xsl]],
-  ?assertThat(Packed, is(equal_to(ExpectedStructure))).
-
-standard_request_creates_nested_iolist(_, _, Config) ->
-  Fixtures = ?config(fixtures, Config),
-  {ok, Xml} = file:read_file(?fixture(Config, "foo.xml")),
-  {ok, Xsl} = file:read_file(?fixture(Config, "to_xml.xsl")),
-  Packed = erlxsl_marshall:pack(<<"">>, ?FILE_INPUT, ?FILE_INPUT, Xml, Xsl),
-  Offset = ?NO_DIV_OFFSET,
-  InputKind = 1,
-  InputHeader = [InputKind, Offset],
-  AllHeaders = [InputHeader, InputHeader],
-  ExpectedStructure = [AllHeaders, [Xml, Xsl]],
+  Packed = erlxsl_marshall:pack(?FILE_INPUT, ?FILE_INPUT,
+                                Xml, Xsl),
+  Headers = <<0:8/native,
+              1:8/native,
+              1:8/native,
+              (byte_size(Xml)):64/native,
+              (byte_size(Xsl)):64/native>>,
+  ExpectedStructure = [Headers, Xml, Xsl],
   ?assertThat(Packed, is(equal_to(ExpectedStructure))).
 
 parameterised_request_becomes_nested_iolist(_, _, _) ->
