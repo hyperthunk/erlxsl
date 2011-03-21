@@ -1,4 +1,54 @@
 
+n.n.n / 2011-03-21 
+==================
+
+  * Add async state field for providers
+  * Change from 2 to 4 spaces indentation
+  * Finally fix binary handling for large and small inputs
+  * Update to my branch of rebar
+  * Tidy up common_test suites; test larger driver I/O
+  * Clarify intent of the small binary ct tests
+  * Merge branch 'master' of github.com:hyperthunk/erlxsl
+  * Work around for small/heap-allocated binaries. Closes #15.
+  * Drop out changes to small binary handling due to excessive complexity; will use place holder ref binaries to minimise this instead
+  * Pull out task submission; Warnings as errors
+  * Update README to reflect support for R14
+  * Upgrade to latest rebar
+  * Fix failing inttests; Tidy up whitespace; Remove async transform test
+  * Store clients as proper list; port controller tidy up
+  * Appropriate error data is returned to client
+  * Stop ignoring errors in worker processes
+  * Fix buffer handling in read_ev
+  * Merge branch 'master' of github.com:hyperthunk/erlxsl
+  * Fix arch specific build options for OS X
+  * Fix ct driver config on linux
+  * Stop passing headers, use IOVec/ErlDrvBin properly
+  * Simplify port driver/controller protocol
+  * Use unsigned 32bit int for size and offset
+  * Fix broken assert checking specs
+  * fix build error in master
+  * Revert "refactor ei_test plumbing"
+  * refactor ei_test plumbing
+  * check for type and unit allocation failures
+  * test cases for ei integration
+  * remove cspec folder; tidy up ei include
+  * Test write_cmd_data macro
+  * provide macro for writing iov command_data
+  * remove over-specification from the API tests
+  * remove erroneous comment from resize_result_buffer macro
+  * fix test engine to use refactored macros
+  * ensure buffer size before appending results
+  * remove mistakenly added swap file
+  * ignore swap files
+  * refactor buffer management macros
+  * tidy up (assign|write)_result buffer macros
+  * tidy uses of ALLOC macro
+  * test command free/init
+  * test command initialisation
+  * refactor assert handling
+  * update changelog
+  * test for init behaviour when malloc fails
+
 0.1.0 / 2011-01-11 
 ==================
 
