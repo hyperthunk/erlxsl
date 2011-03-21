@@ -468,6 +468,7 @@ init_command(const char *command, DriverContext *context,
     cmd->alloc = internal_alloc;
     cmd->release = internal_free;
     cmd->resize = internal_realloc;
+    cmd->async_state = NULL;
     return cmd;
 };
 

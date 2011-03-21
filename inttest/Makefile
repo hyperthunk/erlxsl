@@ -6,7 +6,7 @@ CFLAGS = -std=c99 -fPIC -I ../c_src -I deps/cspec/src -Werror
 LIB = deps/cspec/build/cspec.o
 BINDIR = bin
 SPECS = $(shell find spec -name so_*.spec)
-TESTS = $(patsubst %.spec,%.c,$(SPECS)) 
+TESTS = $(patsubst %.spec,%.c,$(SPECS))
 ALL_SPECS = spec/all_specs.c
 TESTBIN = bin/all_specs
 TESTLIB = bin/lib_stub.so
@@ -42,7 +42,7 @@ $(BINDIR):
 	mkdir -p $@
 
 #no longer in use!
-.spec.c:  
+.spec.c:
 	deps/cspec/bin/cspec < $*.spec > $@
 
 deps/cspec:

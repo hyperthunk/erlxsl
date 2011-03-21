@@ -381,6 +381,8 @@ typedef struct {
     realloc_f* resize;
     /* Custom 'free' (wraps drivers allocation strategy) */
     release_f* release;
+    /* A general purpose storage area - providers can use this as they please */
+    void *async_state;
 } Command;
 
 /*

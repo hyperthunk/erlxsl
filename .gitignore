@@ -27,3 +27,5 @@ c_src/cscope.outcscope.out
 inttest/deps/cspec
 inttest/bin/all_specserlxsl.komodoproject
 .komodotools/
+inttest/bin/all_specs
+priv/test/bin/test_harness
