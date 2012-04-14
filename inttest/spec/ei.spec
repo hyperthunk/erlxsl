@@ -68,7 +68,7 @@ describe "Decoding Buffers using EI"
         );
         state should be OutOfMemory;
         free_command(cmd);
-end
+    end
 
 end
 

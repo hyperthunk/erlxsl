@@ -123,33 +123,12 @@ extern "C" {
                  memcpy((((item_T*)cmd->command_data.iov->payload.data) + (cmd->command_data.iov->size - 1)), item, sizeof(item_T))) \
             : (cmd->command_data.iov->size += 1, cmd->command_data.iov->payload.data = item))
 
-#define write_cmd_data2(item_T, item, cmd) \
-    do { \
-        if (cmd != NULL && item != NULL) {    \
-            Int32 size = cmd->command_data.iov->size; \
-            if (size > 0) { \
-                Int32 idx = size -1;    \
-                item_T *p = (item_T*)cmd->command_data.iov->payload.data;    \
-                item_T *chunk = (item_T*)cmd->resize(cmd->command_data.iov->payload.data, \
-                        (sizeof(item_T) * cmd->command_data.iov->size));    \
-                cmd->command_data.iov->payload.data = chunk;    \
-                for (Int32 i = 0; i < idx; i++) { \
-                    chunk[i] = p[i];    \
-                } \
-                chunk[idx] = item;    \
-            } else {    \
-                cmd->command_data.iov->size += 1;     \
-                cmd->command_data.iov->payload.data = item; \
-            } \
-        } \
-    } while (false)
-
 /* Resizes the result buffer of 'cmd' using its 'resize' function
  * pointer to the 'newsize'. The DriverIOVec size is updated and
  * the expression evaluates to the (potentially re-positioned) reassigned buffer.
  */
 #define resize_result_buffer(newsize, cmd) \
-    (cmd->result->payload.buffer = \
+    (cmd->result->payload.buffer =  /* UNSAFE: shouldn't this be an unsigned 32bit int!? */ \
         cmd->resize(cmd->result->payload.buffer, cmd->result->size = (Int32)newsize))
 
 #define cmd_buff(cmd) cmd->result->payload.buffer
@@ -162,6 +141,7 @@ extern "C" {
         ? NULL /* we cannot proceed */ \
         : (cmd->result->dirty == 0) \
             ? (cmd->result->size < strlen(buff)) \
+                /* NB: resize_result_buffer expands to an assignment, so no dangling pointers are left behind */
                 ? resize_result_buffer(strlen(buff), cmd) \
                     /* we've enough room to work here */ \
                 : (cmd->result->payload.buffer == NULL) \
@@ -177,6 +157,7 @@ extern "C" {
      do {   \
          if (cmd != NULL && cmd->result != NULL) {  \
              cmd->result->dirty = 0;    \
+             /* FIXME: shouldn't this be cmd->release(.....) instead? */ \
              DRV_FREE(cmd->result->payload.buffer); \
              cmd->result->payload.buffer = NULL;    \
          }  \
@@ -298,7 +279,8 @@ typedef struct {
     /* Indicates the type of data in the 'payload' field. */
     DataFormat type;
     /* Indicates the size of the buffer (or data) where this is necessary. */
-    Int32 size; // FIXME: this is a big assumption about the MAX response size!
+    Int32 size; // FIXME: should be 64bits not 32 (or switch on build settings)
+    // UNSAFE: size should be unsigned!!!
     union {
         /* Maintaining our response data in a buffer. */
         char* buffer;
@@ -307,7 +289,7 @@ typedef struct {
     } payload;
 } DriverIOVec;
 
-/* Stores the data an input type specifier for an input document. */
+/* Stores an input type specifier for an input document. */
 typedef struct {
     /*
      * Indicates whether the buffer contains the document
@@ -324,6 +306,9 @@ typedef struct {
 typedef struct {
     /* Stores the port associated with the current driver instance. */
     void* port;
+    // FIXME: this type probably changes between different compiled beam installs
+    //          therefore we should either reference the right header (erl_driver?)
+    //          or use a void pointer and cast it back to ErlDrvPort in the driver code.
     /* Stores the calling process' Pid. */
     unsigned long caller_pid;
 } DriverContext;
